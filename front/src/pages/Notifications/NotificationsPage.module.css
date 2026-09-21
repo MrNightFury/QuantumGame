@@ -1,0 +1,104 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: rgba(22, 18, 33, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 0.5rem 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto 1rem;
+}
+
+.headerIconWrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #FFFFFF;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    padding: 0.3rem 1rem;
+}
+
+.headerIcon {
+    font-size: 1.5rem;
+    color: #FFFFFF;
+    cursor: pointer;
+}
+
+.headerIconButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+}
+
+.headerTitle {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.notificationsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    overflow-y: auto;
+    max-height: 100%;
+    box-sizing: border-box;
+}
+
+.notification {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.notificationInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.notificationTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.notificationText {
+    font-size: 1rem;
+    color: #FFFFFF;
+    opacity: 0.5;
+}
+
+.notificationButtons {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.notificationButtons button {
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: 2.25rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}

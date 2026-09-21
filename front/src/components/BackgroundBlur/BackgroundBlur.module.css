@@ -1,0 +1,11 @@
+.background {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-color: #0c0813;
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% 0%, rgba(43, 54, 166, 0.28), transparent 65%),
+    radial-gradient(ellipse 70% 45% at 100% 100%, rgba(61, 74, 235, 0.12), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 0% 70%, rgba(108, 140, 255, 0.08), transparent 55%);
+}

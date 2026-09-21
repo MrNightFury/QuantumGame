@@ -1,0 +1,346 @@
+.header {
+    width: 100%;
+    display: flex;
+    text-align: center;
+    justify-content: end;
+    align-items: center;
+    padding: 1rem;
+    background-color: rgba(22, 18, 33, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 0.5rem 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    box-sizing: border-box;
+    margin: 0 auto 1rem;
+}
+
+.headerInfo {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.headerIconButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    cursor: pointer;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.3rem;
+    transition: background-color 0.3s ease;
+}
+
+.headerIconButton:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.headerIcon {
+    width: 2rem;
+    height: 2rem;
+    cursor: pointer;
+    color: #bebebe;
+    transition: color 0.3s ease;
+}
+
+.headerIcon:hover {
+    color: #ffffff;
+}
+
+.profileInfoHeader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.profileInfoTitle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.profileInfoTitleContainer {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.profileInfoTitleEditButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    cursor: pointer;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem;
+    transition: background-color 0.3s ease;
+}
+
+.profileInfoTitleEditIcon {
+    width: 2rem;
+    height: 2rem;
+    color: #ffffff;
+}
+
+.profileInfoTitleEditButton:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.main {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.profileInfo {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    box-sizing: border-box;
+}
+
+.profileAvatar {
+    width: 5rem;
+    height: 5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    border-radius: 50%;
+    box-sizing: border-box;
+    background-color: rgba(22, 18, 33, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 10px 10px rgba(32, 59, 100, 0.5);
+}
+
+.profileInfoItems {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    width: 100%;
+}
+
+.profileInfoItem {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background-color: rgba(22, 18, 33, 0.7);
+    border-radius: 1rem;
+    box-sizing: border-box;
+}
+
+.profileProgress {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: linear-gradient(120deg, rgba(43, 54, 166, 0.5) 0%, rgba(21, 22, 42, 0.5) 100%);
+    border-radius: 1rem;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.profileProgressIcon {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.profileProgressIconLabel {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #bebebe;
+}
+
+.profileProgressTitle {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.profileProgressDescription {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #bebebe;
+}
+
+.profileProgressBar {
+    width: 100%;
+    height: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: rgba(22, 18, 33, 0.7);
+    border-radius: 1rem;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.profileProgressBarFill {
+    height: 100%;
+    background-color: #6C8CFF;
+    border-radius: 1rem;
+}
+
+
+.profileHistory {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 1rem;
+    box-sizing: border-box;
+}
+
+.profileHistoryHeader {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.profileHistoryTitle {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.profileHistoryButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    width: auto !important;
+    background: linear-gradient(120deg, rgba(43, 54, 166, 0.5) 0%, rgba(21, 22, 42, 0.5) 100%);
+    gap: 0.5rem;
+}
+
+.profileHistoryContent {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    width: 100%;
+}
+
+.profileHistoryItem {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 1rem;
+    background-color: rgba(22, 18, 33, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 1rem;
+    box-sizing: border-box;
+}
+
+.profileHistoryItemTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.profileHistoryItemRating {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #ffffff;
+}
+
+.profileHistoryItemMoves {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #9e9e9e;
+}
+
+.status {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: start;
+    gap: 0.5rem;
+}
+
+.statusIcon {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background-color: #6C8CFF;
+}
+
+.positive {
+    color: #00FF00;
+}
+
+.negative {
+    color: #FF0000;
+}
+
+.statusText {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.profileInfoEditModalContent {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-content: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 1rem;
+    border-radius: 1rem;
+    box-sizing: border-box;
+}
+
+.profileInfoEditModalItem {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.profileInfoEditModalInput {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    background-color: rgba(22, 18, 33, 0.7);
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 400;
+    box-sizing: border-box;
+}
