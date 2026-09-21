@@ -31,8 +31,10 @@ class GameController {
         // cubit index in their register) the next scanned card will hit.
         void selectTarget(uint8_t clientId, JsonVariantConst data);
         // "writeCard": arms card registration - the next tag scanned while
-        // no game is running is bound to the given card type.
-        void writeCard(JsonVariantConst data);
+        // no game is running is bound to the given card type. An empty type
+        // name cancels the pending write (nothing is sent); an actual
+        // registration confirms with "cardWritten" to the sender.
+        void writeCard(uint8_t clientId, JsonVariantConst data);
         // "giveUp": the sender admits defeat, the game ends with another
         // player as the winner.
         void giveUp(uint8_t clientId);
@@ -52,6 +54,8 @@ class GameController {
         // registered with this type instead of being reported.
         bool awaitingCard = false;
         CardRegistry::CardType pendingCardType;
+        // Client that armed the pending write; it receives "cardWritten".
+        uint8_t pendingWriteClient = 0;
 
         // Cubit chosen by the current player for the next scanned card.
         bool hasTarget = false;

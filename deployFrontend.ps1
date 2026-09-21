@@ -1,12 +1,12 @@
-# Builds the web frontend (../front), copies its dist/ into this project's
+# Builds the web frontend (front/), copies its dist/ into the controller's
 # data/ folder and uploads it to the controller as SPIFFS files.
 #
 # Usage:
-#   .\deploy.ps1              # build + copy + upload filesystem
-#   .\deploy.ps1 -SkipUpload  # build + copy only (no board needed)
+#   .\deployFrontend.ps1              # build + copy + upload filesystem
+#   .\deployFrontend.ps1 -SkipUpload  # build + copy only (no board needed)
 
 param(
-    [string]$FrontDir = (Join-Path $PSScriptRoot "..\front"),
+    [string]$FrontDir = (Join-Path $PSScriptRoot "front"),
     [switch]$SkipUpload
 )
 
@@ -14,7 +14,8 @@ $ErrorActionPreference = "Stop"
 
 # PlatformIO is not on PATH in this environment.
 $pio = Join-Path $env:USERPROFILE ".platformio\penv\Scripts\pio.exe"
-$dataDir = Join-Path $PSScriptRoot "data"
+$controllerDir = Join-Path $PSScriptRoot "controller"
+$dataDir = Join-Path $controllerDir "data"
 
 if (-not (Test-Path (Join-Path $FrontDir "package.json"))) {
     throw "No package.json found in $FrontDir"
@@ -69,11 +70,11 @@ foreach ($file in $dataFiles) {
 if ($SkipUpload) {
     Write-Host "Skipping upload (-SkipUpload)" -ForegroundColor Yellow
 } else {
-    Write-Host "== pio run -t uploadfs ==" -ForegroundColor Cyan
+    Write-Host "== pio run -d $controllerDir -t uploadfs ==" -ForegroundColor Cyan
     # PS 5.1: with $ErrorActionPreference=Stop a direct `& $pio ... 2>&1`
     # turns the first stderr line into a terminating NativeCommandError.
     # Merge the streams inside cmd instead.
-    $uploadOutput = cmd /c "`"$pio`" run -t uploadfs 2>&1"
+    $uploadOutput = cmd /c "`"$pio`" run -d `"$controllerDir`" -t uploadfs 2>&1"
     $uploadOutput | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0) {
         throw "uploadfs failed"

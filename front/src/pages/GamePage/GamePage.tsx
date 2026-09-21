@@ -8,10 +8,11 @@ import type { GameStateData } from '../../api/events'
 import type { BoardOwner } from '../../game/types'
 import { getDiceImageUrl } from '../../lib/assets'
 import { parseDiceFace } from '../../lib/dice'
-import type { DiceState } from '../../types/dice'
-import type { GateId } from '../../types/qubitDemo'
+import { DICE_STATES, type DiceState } from '../../types/dice'
+import { ALL_CARD_IDS } from '../../data/cards'
+import type { CardId } from '../../types/card'
 import { Modal } from '../../components/Modal/Modal'
-import { GatePanel } from './GatePanel'
+import { DiceChoiceModal } from '../../components/DiceChoiceModal/DiceChoiceModal'
 import { QubitSlot } from './QubitSlot'
 import { RulesFrame } from './RulesFrame'
 import s from './GamePage.module.css'
@@ -34,7 +35,6 @@ type Target = { player: number; cubit: number }
 type Selection = {
   /** Состояние поля, к которому относится выбор. При новом setGameState выбор сбрасывается. */
   forState: GameStateData | null
-  gate: GateId | null
   target: Target | null
 }
 
@@ -42,22 +42,21 @@ function toSlots(faces: string[] | undefined): Slot[] {
   return (faces ?? []).map((face) => ({ dice: parseDiceFace(face), frozen: false }))
 }
 
+const KNOWN_CARD_IDS = new Set<string>(ALL_CARD_IDS)
+
+function toCardId(name: string): CardId | null {
+  return KNOWN_CARD_IDS.has(name) ? (name as CardId) : null
+}
+
 export const GamePage = () => {
   const navigate = useNavigate()
   const { userId, onlineUsers } = useSyncExternalStore(subscribeConnection, getConnectionState)
   const { started, state, ended } = useSyncExternalStore(subscribeGame, getGameData)
 
-  const [selection, setSelection] = useState<Selection>({ forState: null, gate: null, target: null })
+  const [selection, setSelection] = useState<Selection>({ forState: null, target: null })
   const [menuOpen, setMenuOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
-
-  const onSelectGate = (gate: GateId) => {
-    setSelection((prev) => ({
-      forState: state,
-      gate,
-      target: prev.forState === state ? prev.target : null,
-    }))
-  }
+  const [choiceOpen, setChoiceOpen] = useState(false)
 
   const myIndex = started && userId !== null ? started.players.indexOf(userId) : -1
   const inGame = myIndex >= 0
@@ -72,20 +71,26 @@ export const GamePage = () => {
   const myTurn = inGame && state !== null && state.currentPlayer === myIndex
 
   const selectionFresh = selection.forState === state
-  const selectedGate = selectionFresh ? selection.gate : null
   const selectedTarget = selectionFresh ? selection.target : null
 
   const onSlotClick = (player: number, cubit: number) => {
     if (!myTurn) return
     if (!selectTarget(player, cubit)) return
-    setSelection((prev) => ({
+    setSelection({
       forState: state,
-      gate: prev.forState === state ? prev.gate : null,
       target: { player, cubit },
-    }))
+    })
   }
   const nicknameOf = (playerId: number): string =>
     onlineUsers.find((user) => user.id === playerId)?.name ?? 'Игрок'
+
+  const fieldCardAt = (playerIndex: number, cubit: number): CardId | null => {
+    if (!state) return null
+    const entry = state.cardsOnField.find(
+      (card) => card.player === playerIndex && card.cubit === cubit,
+    )
+    return entry ? toCardId(entry.card) : null
+  }
 
   const restart = () => {
     if (started) startGame(started.players, started.cubitCount)
@@ -106,6 +111,7 @@ export const GamePage = () => {
               selectedTarget.cubit === index
             }
             disabled={!myTurn}
+            card={fieldCardAt(playerIndex, index)}
             onClick={() => onSlotClick(playerIndex, index)}
           />
         ))}
@@ -136,14 +142,14 @@ export const GamePage = () => {
         <section className={s.playersBar}>
           <div className={s.playersRow}>
             <div className={`${s.playerCard} ${myTurn ? s.playerCardActive : ''}`}>
-              <div className={s.playerAvatar}>{avatar}</div>
+              <div className={s.playerAvatar} onClick={() => setChoiceOpen(true)}>{avatar}</div>
               <span className={s.playerName}>{nicknameOf(myId)}</span>
               <span className={`${s.playerStatus} ${myTurn ? s.playerStatusActive : ''}`}>
                 {myTurn ? 'ВАШ ХОД' : 'ЖДИТЕ'}
               </span>
             </div>
             <div className={`${s.playerCard} ${!myTurn && state ? s.playerCardActive : ''}`}>
-              <div className={s.playerAvatar}>{avatar}</div>
+              <div className={s.playerAvatar} onClick={() => setChoiceOpen(true)}>{avatar}</div>
               <span className={s.playerName}>{nicknameOf(opponentId)}</span>
               <span className={`${s.playerStatus} ${!myTurn && state ? s.playerStatusActive : ''}`}>
                 {!myTurn && state ? 'ВАШ ХОД' : 'ЖДИТЕ'}
@@ -172,9 +178,19 @@ export const GamePage = () => {
             {renderRow('my', 'Ваш ряд', mySlots, myIndex)}
           </div>
         </section>
-
-        <GatePanel selected={selectedGate} onSelect={onSelectGate} />
       </main>
+
+      {choiceOpen && (
+        <DiceChoiceModal
+          title="Выберите состояние кубита"
+          options={[...DICE_STATES]}
+          onSelect={(state) => {
+            console.log('Выбран кубит:', state)
+            setChoiceOpen(false)
+          }}
+          onClose={() => setChoiceOpen(false)}
+        />
+      )}
 
       {menuOpen && (
         <Modal title="Меню" onClose={() => setMenuOpen(false)}>

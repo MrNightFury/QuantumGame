@@ -14,12 +14,22 @@ export interface GameStartedData {
   cubitCount: number
 }
 
+export interface FieldCardData {
+  /** Индекс игрока в списке players. */
+  player: number
+  /** Индекс кубита в ряду игрока. */
+  cubit: number
+  /** Имя типа карты (совпадает с CardId). */
+  card: string
+}
+
 export interface GameStateData {
   players: number[]
   registers: string[][]
   targetRegister: string[]
   currentPlayer: number
   playedCards: number
+  cardsOnField: FieldCardData[]
 }
 
 export interface CardPlayedTarget {
@@ -53,6 +63,7 @@ export type ServerEvent =
   | { event: 'cardPlayed'; data: CardPlayedData }
   | { event: 'gameEnded'; data: GameEndedData }
   | { event: 'cardScanned'; data: CardScannedData }
+  | { event: 'cardWritten'; data: null }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -85,6 +96,19 @@ function isGameStartedData(value: unknown): value is GameStartedData {
   )
 }
 
+function isFieldCardData(value: unknown): value is FieldCardData {
+  return (
+    isRecord(value) &&
+    typeof value.player === 'number' &&
+    typeof value.cubit === 'number' &&
+    typeof value.card === 'string'
+  )
+}
+
+function isFieldCardList(value: unknown): value is FieldCardData[] {
+  return Array.isArray(value) && value.every(isFieldCardData)
+}
+
 function isGameStateData(value: unknown): value is GameStateData {
   return (
     isRecord(value) &&
@@ -93,7 +117,8 @@ function isGameStateData(value: unknown): value is GameStateData {
     Array.isArray(value.targetRegister) &&
     value.targetRegister.every((cell) => typeof cell === 'string') &&
     typeof value.currentPlayer === 'number' &&
-    typeof value.playedCards === 'number'
+    typeof value.playedCards === 'number' &&
+    isFieldCardList(value.cardsOnField)
   )
 }
 
@@ -146,6 +171,12 @@ export function parseServerEvent(raw: unknown): ServerEvent | null {
       return isGameEndedData(data) ? { event, data } : null
     case 'cardScanned':
       return isCardScannedData(data) ? { event, data } : null
+    case 'cardWritten':
+      // Контроллер шлёт data: null (пустой JsonDocument). Пустой объект
+      // тоже принимаем и нормализуем в null.
+      return data === null || (isRecord(data) && Object.keys(data).length === 0)
+        ? { event, data: null }
+        : null
     default:
       return null
   }

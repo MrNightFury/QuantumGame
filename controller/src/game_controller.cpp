@@ -33,7 +33,7 @@ void GameController::handleWsEvent(const char *event, uint8_t clientId,
     } else if (strcmp(event, "selectTarget") == 0) {
         selectTarget(clientId, data);
     } else if (strcmp(event, "writeCard") == 0) {
-        writeCard(data);
+        writeCard(clientId, data);
     } else if (strcmp(event, "giveUp") == 0) {
         giveUp(clientId);
     } else {
@@ -53,6 +53,9 @@ void GameController::handleTag(const NfcScanner::TagEvent &event) {
             awaitingCard = false;
             Serial.printf("[Game] Card registered as %s\n",
                           CardRegistry::toString(pendingCardType));
+            // No data: only the writer needs to know the write is done.
+            JsonDocument writtenDoc;
+            ws.send(pendingWriteClient, "cardWritten", writtenDoc);
             return;
         }
 
@@ -209,12 +212,21 @@ void GameController::selectTarget(uint8_t clientId, JsonVariantConst data) {
                   (unsigned int)playerIndex, (unsigned int)cubitIndex);
 }
 
-void GameController::writeCard(JsonVariantConst data) {
+void GameController::writeCard(uint8_t clientId, JsonVariantConst data) {
     if (!data.is<const char *>()) {
         Serial.println("[Game] writeCard has invalid data");
         return;
     }
     const char *typeName = data.as<const char *>();
+
+    // An empty type name cancels the pending write: clear the armed state.
+    // No "cardWritten" is sent - it only confirms an actual registration.
+    if (typeName[0] == '\0') {
+        awaitingCard = false;
+        Serial.println("[Game] Pending card write cancelled");
+        return;
+    }
+
     CardRegistry::CardType type;
     if (!CardRegistry::fromString(typeName, type)) {
         Serial.printf("[Game] writeCard: unknown card type %s\n", typeName);
@@ -222,6 +234,7 @@ void GameController::writeCard(JsonVariantConst data) {
     }
 
     pendingCardType = type;
+    pendingWriteClient = clientId;
     awaitingCard = true;
     Serial.printf("[Game] Waiting for a card to register as %s\n", typeName);
 }

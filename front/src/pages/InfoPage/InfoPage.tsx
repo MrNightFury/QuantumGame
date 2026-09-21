@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { EffectCoverflow } from 'swiper/modules'
 import type { Swiper as SwiperInstance } from 'swiper'
@@ -6,8 +6,12 @@ import 'swiper/css'
 import 'swiper/css/effect-coverflow'
 
 import { onServerEvent } from '../../api/serverEvents'
+import { writeCard } from '../../api/game'
 import { ALL_CARD_IDS } from '../../data/cards'
 import { getCardImageUrl } from '../../lib/assets'
+import { Button } from '../../components/Button/Button'
+import { Modal } from '../../components/Modal/Modal'
+import type { CardId } from '../../types/card'
 import s from './InfoPage.module.css'
 
 const CARD_COUNT = ALL_CARD_IDS.length
@@ -32,6 +36,9 @@ function fixLoopPosition(swiper: SwiperInstance) {
 
 export const InfoPage = () => {
   const swiperRef = useRef<SwiperInstance | null>(null)
+  // 'idle' — окно закрыто; 'waiting' — ждём прикладывания карты;
+  // 'done' — карта записана (пришло cardWritten).
+  const [writeState, setWriteState] = useState<'idle' | 'waiting' | 'done'>('idle')
 
   const slides = useMemo(
     () => [...ALL_CARD_IDS, ...ALL_CARD_IDS, ...ALL_CARD_IDS],
@@ -39,8 +46,13 @@ export const InfoPage = () => {
   )
 
   // Считывание карты контроллером → показать её в картотеке.
+  // cardWritten → карта записана в реестр, закрываем ожидание.
   useEffect(() => {
     const unsubscribe = onServerEvent((event) => {
+      if (event.event === 'cardWritten') {
+        setWriteState('done')
+        return
+      }
       if (event.event !== 'cardScanned' || !event.data.registered) return
       const index = event.data.type !== undefined ? CARD_INDEX.get(event.data.type) : undefined
       if (index === undefined || swiperRef.current === null) return
@@ -49,6 +61,26 @@ export const InfoPage = () => {
     })
     return unsubscribe
   }, [])
+
+  /** Карта, выбранная на слайдере (activeIndex живёт в средней копии колоды). */
+  const currentCardId = (): CardId => {
+    const index = swiperRef.current?.activeIndex ?? CARD_COUNT
+    return ALL_CARD_IDS[index % CARD_COUNT]
+  }
+
+  const startWrite = () => {
+    writeCard(currentCardId())
+    setWriteState('waiting')
+  }
+
+  const cancelWrite = () => {
+    writeCard('')
+    setWriteState('idle')
+  }
+
+  const finishWrite = () => {
+    setWriteState('idle')
+  }
 
   return (
     <>
@@ -93,7 +125,33 @@ export const InfoPage = () => {
             </SwiperSlide>
           ))}
         </Swiper>
+
+        <Button type="primary" className={s.writeButton} onClick={startWrite}>
+          Записать карту
+        </Button>
       </main>
+
+      {writeState !== 'idle' && (
+        <Modal
+          title={writeState === 'waiting' ? 'Запись карты' : 'Карта записана'}
+          onClose={writeState === 'waiting' ? cancelWrite : finishWrite}
+        >
+          <p className={s.writeText}>
+            {writeState === 'waiting' ? 'Приложите карту' : 'Карта записана'}
+          </p>
+          <div className={s.writeActions}>
+            {writeState === 'waiting' ? (
+              <Button type="secondary" onClick={cancelWrite}>
+                Отмена
+              </Button>
+            ) : (
+              <Button type="primary" onClick={finishWrite}>
+                Ок
+              </Button>
+            )}
+          </div>
+        </Modal>
+      )}
     </>
   )
 }

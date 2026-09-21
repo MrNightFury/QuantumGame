@@ -67,6 +67,11 @@ export function giveUp(): boolean {
   return sendSocketMessage({ event: 'giveUp' })
 }
 
+/** Отправить writeCard: typeName — тип карты для записи; пустая строка отменяет ожидание. */
+export function writeCard(typeName: string): boolean {
+  return sendSocketMessage({ event: 'writeCard', data: typeName })
+}
+
 export function getGameData(): GameData {
   return data
 }
