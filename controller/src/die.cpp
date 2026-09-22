@@ -1,7 +1,7 @@
 #include "die.h"
 
 namespace {
-// Image of every face after a +90 degree rotation around each axis
+// State of every face after a +90 degree rotation around each axis
 // (rows: X, Y, Z). Faces lying on the rotation axis map to themselves.
 //   X: "i" -> "0" -> "-i" -> "1" -> "i"
 //   Y: "+" -> "1" -> "-" -> "0" -> "+"

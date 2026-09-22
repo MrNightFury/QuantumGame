@@ -42,8 +42,8 @@ void GameController::handleWsEvent(const char *event, uint8_t clientId,
 }
 
 void GameController::handleTag(const NfcScanner::TagEvent &event) {
+    // Not in game: register card or report scan
     if (!isGameOn || !gameState) {
-        // Outside a game: either register an armed card or report the scan.
         CardRegistry::CardType type;
         bool registered = cards.lookup(event.uid, event.uidLength, type);
 

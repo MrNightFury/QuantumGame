@@ -3,6 +3,7 @@
 #include <FS.h>
 #include <SPIFFS.h>
 #include <WiFi.h>
+#include <DNSServer.h>
 
 BoardGameWeb::BoardGameWeb(const Config &config)
     : ssid(config.ssid),
@@ -12,11 +13,14 @@ BoardGameWeb::BoardGameWeb(const Config &config)
         while (1);
     }
 
-    setupWifi();
+    Serial.println("SPIFFS mounted successfully");
+    IPAddress ip = setupWifi();
+    setupDNS(ip);
     setupWebServer();
 }
 
 void BoardGameWeb::loop() {
+    dns.processNextRequest();
     server.handleClient();
 }
 
@@ -46,8 +50,7 @@ bool BoardGameWeb::serveStaticFile(const String &path) {
         return false;
     }
 
-    // Asset names carry no content hash, so clients must always revalidate
-    // to pick up freshly deployed files.
+    // Dev thing so browsers won't cache files
     server.sendHeader("Cache-Control", "no-cache");
     server.streamFile(file, contentTypeFromPath(path));
     file.close();
@@ -78,7 +81,7 @@ void BoardGameWeb::setupWebServer() {
     server.begin();
 }
 
-void BoardGameWeb::setupWifi() {
+IPAddress BoardGameWeb::setupWifi() {
     WiFi.mode(WIFI_AP);
     bool started = WiFi.softAP(ssid, password);
     if (!started) {
@@ -88,4 +91,10 @@ void BoardGameWeb::setupWifi() {
 
     Serial.print("Wi-Fi AP started. IP: ");
     Serial.println(WiFi.softAPIP());
+    return WiFi.softAPIP();
+}
+
+void BoardGameWeb::setupDNS(IPAddress ip) {
+    // Redirect everything to ugly controller IP
+    dns.start(53, "*", ip);
 }
