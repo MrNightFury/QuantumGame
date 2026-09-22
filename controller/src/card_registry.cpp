@@ -26,7 +26,24 @@ const uint8_t DEFAULT_PAULI_Y3_UID[] = {0x04, 0x11, 0x22, 0x33, 0x44, 0x55, 0xAA
 const uint8_t DEFAULT_PAULI_Z3_UID[] = {0x04, 0x11, 0x22, 0x33, 0x44, 0x55, 0xBB};
 
 const char *const TYPE_NAMES[] = {
-    "pauli_x", "pauli_y", "pauli_z", "pauli_x3", "pauli_y3", "pauli_z3"};
+    "pauli_x", "pauli_y", "pauli_z", "pauli_x3", "pauli_y3", "pauli_z3",
+    
+    "rotate_x",
+    "rotate_y",
+    "rotate_z",
+    "phase_forward",
+    "phase_backward",
+    "hadamard",
+    "hadamard_3",
+    "swap",
+    "quantum_noise",
+    "kronecker_multiplication",
+    "measurement",
+    "identity",
+    "barrier",
+    "reshuffle",
+    "quantum_lucky",
+};
 const size_t TYPE_COUNT = sizeof(TYPE_NAMES) / sizeof(TYPE_NAMES[0]);
 
 bool sameUid(const std::vector<uint8_t> &uid, const uint8_t *other, uint8_t otherLength) {

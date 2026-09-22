@@ -1,7 +1,7 @@
 export type CardType =
   | 'PAULI'
-  | 'ROTATE'
   | 'PHASE'
+  | 'ROTATE'
   | 'HADAMARD'
   | 'SWAP'
   | 'KRONECKER_MULTIPLICATION'
@@ -11,23 +11,26 @@ export type CardType =
 
 export type CardId =
   | 'pauli_x'
-  | 'pauli_x3'
   | 'pauli_y'
-  | 'pauli_y3'
   | 'pauli_z'
+  | 'pauli_x3'
+  | 'pauli_y3'
   | 'pauli_z3'
+  | 'phase_forward'
+  | 'phase_backward'
   | 'rotate_x'
   | 'rotate_y'
   | 'rotate_z'
-  | 'phase_forward'
-  | 'phase_backward'
   | 'hadamard'
   | 'hadamard_3'
   | 'swap'
+  | 'quantum_noise'
   | 'kronecker_multiplication'
   | 'measurement'
   | 'identity'
+  | 'barrier'
   | 'reshuffle'
+  | 'quantum_lucky'
 
 
 export interface Card {

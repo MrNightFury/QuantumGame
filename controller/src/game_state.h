@@ -24,15 +24,10 @@ struct GameState {
     // can be played only once, so duplicates are recognized by uid.
     std::vector<std::vector<uint8_t>> playedCardUids;
 
-    // A card played onto a cubit that stays on it.
-    struct FieldCard {
-        size_t player;  // index into playerIds
-        size_t cubit;   // index into that player's register
-        CardRegistry::CardType type;
-    };
-    // Cards lying on the cubits. No current card type stays on the field
-    // yet, the state is in place for the ones that will.
-    std::vector<FieldCard> cardsOnField;
+    // History of the cards played on each cubit during the game, indexed by
+    // [player][cubit]. Each entry lists the card types applied to that cubit
+    // in play order; a future card will be able to undo the last one.
+    std::vector<std::vector<std::vector<CardRegistry::CardType>>> cardHistory;
 
     // Whether the tag uid has already been played in this game.
     bool isCardPlayed(const uint8_t *uid, uint8_t uidLength) const;

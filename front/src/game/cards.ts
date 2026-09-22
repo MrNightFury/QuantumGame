@@ -20,4 +20,7 @@ export const CARD_META: Record<CardId, CardMeta> = {
   measurement: { placement: 'field', radius: 1 },
   identity: { placement: 'discard', radius: 1 },
   reshuffle: { placement: 'discard', radius: 1 },
+  quantum_noise: { placement: 'field', radius: 1 },
+  barrier: { placement: 'field', radius: 1 },
+  quantum_lucky: { placement: 'field', radius: 1 }
 }

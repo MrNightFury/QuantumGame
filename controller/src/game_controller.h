@@ -11,8 +11,7 @@
 
 namespace Game {
 
-// Central place for the game flow: reacts to scanned cards and ws events,
-// talks to the players through WebSockets.
+// Class for all game logic. Subscribes to events from reader and ws
 class GameController {
     public:
         GameController(NfcScanner &scanner, WSController &ws);
@@ -21,8 +20,7 @@ class GameController {
         // Ws event handler; switch by event name.
         void handleWsEvent(const char *event, uint8_t clientId,
                            JsonVariantConst data);
-        // Tag handler; switch by card type. Runs in the main loop context
-        // (NfcScanner delivers events through its queue).
+        // Tag handler; switch by card type. Runs in the main loop context (Hopefully)
         void handleTag(const NfcScanner::TagEvent &event);
 
         // "startGame": creates a fresh GameState and notifies the players.
@@ -38,8 +36,16 @@ class GameController {
         // "giveUp": the sender admits defeat, the game ends with another
         // player as the winner.
         void giveUp(uint8_t clientId);
+        // "cardInput": the current player supplies the extra input the
+        // pending card is waiting for (a second target or a chosen face).
+        void cardInput(uint8_t clientId, JsonVariantConst data);
         // Ends the running game and sends "gameEnded" to the participants.
         void endGame(size_t winnerIndex);
+        // Applies the card with the given inputs, burns the tag uid, advances
+        // the turn and notifies the players. Returns false if the card had no
+        // effect and was ignored.
+        bool commitCard(CardRegistry::CardType type, const uint8_t *uid,
+                        uint8_t uidLength, const CardParams &params);
         // Builds the data payload of a "setGameState" event.
         JsonDocument buildGameStateDoc() const;
 
@@ -59,8 +65,16 @@ class GameController {
 
         // Cubit chosen by the current player for the next scanned card.
         bool hasTarget = false;
-        size_t targetPlayer = 0;
-        size_t targetCubit = 0;
+        Target target;
+
+        // A card scanned during a game that needs extra input (a second
+        // target or a chosen face) before it can be applied. The primary
+        // target is the current aim (hasTarget/target); the extra input
+        // arrives via "cardInput" and applies the card immediately.
+        bool pendingPlayActive = false;
+        CardRegistry::CardType pendingPlayType;
+        uint8_t pendingPlayUid[8];
+        uint8_t pendingPlayUidLength = 0;
 };
 
 }  // namespace Game

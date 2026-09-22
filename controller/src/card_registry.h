@@ -11,12 +11,17 @@ namespace Game {
 class CardRegistry {
 public:
     enum class CardType : uint8_t {
-        PauliX,
-        PauliY,
-        PauliZ,
-        PauliX3,
-        PauliY3,
-        PauliZ3,
+        PauliX, PauliY, PauliZ,
+        PauliX3, PauliY3, PauliZ3,
+
+        RotateX, RotateY, RotateZ,
+        PhaseForward, PhaseBackward,
+        Hadamard, Hadamard3,
+        Swap,
+        KroneckerMultiplication,
+        Measurement,
+        Identity,
+        Reshuffle
     };
 
     struct Entry {

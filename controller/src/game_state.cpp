@@ -11,6 +11,10 @@ GameState::GameState(const std::vector<uint8_t> &playerIds, size_t diceCount)
     for (size_t i = 0; i < playerIds.size(); i++) {
         registers.emplace_back(diceCount);
     }
+    cardHistory.resize(playerIds.size());
+    for (std::vector<std::vector<CardRegistry::CardType>> &playerHistory : cardHistory) {
+        playerHistory.resize(diceCount);
+    }
 }
 
 bool GameState::isCardPlayed(const uint8_t *uid, uint8_t uidLength) const {
