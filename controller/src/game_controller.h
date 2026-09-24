@@ -2,6 +2,7 @@
 
 #include <ArduinoJson.h>
 #include <memory>
+#include <map>
 
 #include "card_effects.h"
 #include "card_registry.h"
@@ -46,6 +47,9 @@ class GameController {
         // effect and was ignored.
         bool commitCard(CardRegistry::CardType type, const uint8_t *uid,
                         uint8_t uidLength, const CardParams &params);
+        // The card cannot be played: drops the aim and any pending input,
+        // tells the current player the reason id. The card is not consumed.
+        void refusePlay(const char *reason);
         // Builds the data payload of a "setGameState" event.
         JsonDocument buildGameStateDoc() const;
 
@@ -75,6 +79,17 @@ class GameController {
         CardRegistry::CardType pendingPlayType;
         uint8_t pendingPlayUid[8];
         uint8_t pendingPlayUidLength = 0;
+
+        // Armed by a scanned kronecker_multiplication card (the card itself
+        // is free - it takes no card slot): the next two applied cards form
+        // a pair that costs a single card slot. The first card of the pair
+        // fixes the registers the pair is bound to (every register it
+        // involved; a card without a target binds none, leaving the pair
+        // unrestricted). While the list is empty the second card may target
+        // any register.
+        bool kroneckerActive = false;
+        size_t kroneckerPairCards = 0;           // 0 or 1 cards of the pair applied
+        std::vector<size_t> kroneckerRegisters;  // registers the pair is bound to
 };
 
 }  // namespace Game

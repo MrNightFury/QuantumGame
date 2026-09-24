@@ -26,6 +26,24 @@ export function parseDiceFace(face: string): DiceState | null {
   }
 }
 
+/** Обратное преобразование DiceState в строку грани протокола сервера. */
+export function diceFaceOf(state: DiceState): string {
+  switch (state) {
+    case 'ZERO':
+      return '0'
+    case 'ONE':
+      return '1'
+    case 'PLUS':
+      return '+'
+    case 'MINUS':
+      return '-'
+    case 'I':
+      return 'i'
+    case 'I_MINUS':
+      return '-i'
+  }
+}
+
 export function randomDiceRow(length = 4): DiceState[] {
   return Array.from({ length }, () => randomDiceState())
 }

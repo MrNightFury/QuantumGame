@@ -3,12 +3,13 @@ import { useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button/Button'
 import { getConnectionState, subscribeConnection } from '../../api/connection'
-import { getGameData, giveUp, selectTarget, startGame, subscribeGame } from '../../api/game'
+import { cardInput, dismissCantPlay, getGameData, getRejectSeq, giveUp, selectTarget, startGame, subscribeGame } from '../../api/game'
 import type { GameStateData } from '../../api/events'
 import type { BoardOwner } from '../../game/types'
 import { getDiceImageUrl } from '../../lib/assets'
-import { parseDiceFace } from '../../lib/dice'
-import { DICE_STATES, type DiceState } from '../../types/dice'
+import { diceFaceOf, parseDiceFace } from '../../lib/dice'
+import { cubitCountLabel } from '../../lib/plural'
+import type { DiceState } from '../../types/dice'
 import { ALL_CARD_IDS } from '../../data/cards'
 import type { CardId } from '../../types/card'
 import { Modal } from '../../components/Modal/Modal'
@@ -35,7 +36,23 @@ type Target = { player: number; cubit: number }
 type Selection = {
   /** Состояние поля, к которому относится выбор. При новом setGameState выбор сбрасывается. */
   forState: GameStateData | null
+  /** rejectSeq на момент выбора. При cantPlay сервер сбрасывает цель — выбор устаревает. */
+  forReject: number
   target: Target | null
+}
+
+/** Тексты причин cantPlay (id из EVENTS.md). Неизвестный id показывается как есть. */
+const CANT_PLAY_REASONS: Record<string, string> = {
+  windowDoesNotFit: 'Карта не может быть сыграна на крайний кубит.',
+  nothingToUndo: 'На выбранном кубите нет карты.',
+  notUndoable: 'Последняя карта на этом кубите не отменяемая.',
+  identityFirst: 'Identity нельзя играть первой картой хода.',
+  alreadyPlayed: 'Эта карта уже сыграна в этой игре.',
+  invalidSecondTarget: 'Некорректная вторая цель.',
+  invalidFace: 'Некорректная грань.',
+  kroneckerAlreadyActive: 'Кронекер-пара уже активна — сначала закройте её.',
+  registerMismatch: 'Вторая карта пары должна попасть в те же регистры.',
+  barrierAlreadySet: 'Следующий игрок уже помечен барьером.',
 }
 
 function toSlots(faces: string[] | undefined): Slot[] {
@@ -48,15 +65,21 @@ function toCardId(name: string): CardId | null {
   return KNOWN_CARD_IDS.has(name) ? (name as CardId) : null
 }
 
+/** Допустимые грани из cardNeedsInput в варианты для DiceChoiceModal. */
+function toDiceOptions(faces: string[] | undefined): DiceState[] {
+  return (faces ?? [])
+    .map((face) => parseDiceFace(face))
+    .filter((dice): dice is DiceState => dice !== null)
+}
+
 export const GamePage = () => {
   const navigate = useNavigate()
   const { userId, onlineUsers } = useSyncExternalStore(subscribeConnection, getConnectionState)
-  const { started, state, ended } = useSyncExternalStore(subscribeGame, getGameData)
+  const { started, state, ended, needsInput, cantPlay } = useSyncExternalStore(subscribeGame, getGameData)
 
-  const [selection, setSelection] = useState<Selection>({ forState: null, target: null })
+  const [selection, setSelection] = useState<Selection>({ forState: null, forReject: 0, target: null })
   const [menuOpen, setMenuOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
-  const [choiceOpen, setChoiceOpen] = useState(false)
 
   const myIndex = started && userId !== null ? started.players.indexOf(userId) : -1
   const inGame = myIndex >= 0
@@ -70,14 +93,32 @@ export const GamePage = () => {
 
   const myTurn = inGame && state !== null && state.currentPlayer === myIndex
 
-  const selectionFresh = selection.forState === state
+  /** Игрок помечен барьером и пропустит свой следующий ход (skipNextTurn). */
+  const skipsNext = (playerIndex: number): boolean => state?.skipNextTurn?.[playerIndex] === true
+
+  /** swap ждёт вторую цель: сервер в этом режиме игнорирует selectTarget. */
+  const awaitingSecond = needsInput !== null && needsInput.need === 'secondTarget'
+
+  const rejectSeq = getRejectSeq()
+  const selectionFresh = selection.forState === state && selection.forReject === rejectSeq
   const selectedTarget = selectionFresh ? selection.target : null
 
   const onSlotClick = (player: number, cubit: number) => {
+    if (awaitingSecond) {
+      if (cardInput({ secondTarget: { player, cubit } })) {
+        setSelection({
+          forState: state,
+          forReject: rejectSeq,
+          target: { player, cubit },
+        })
+      }
+      return
+    }
     if (!myTurn) return
     if (!selectTarget(player, cubit)) return
     setSelection({
       forState: state,
+      forReject: rejectSeq,
       target: { player, cubit },
     })
   }
@@ -86,10 +127,8 @@ export const GamePage = () => {
 
   const fieldCardAt = (playerIndex: number, cubit: number): CardId | null => {
     if (!state) return null
-    const entry = state.cardsOnField.find(
-      (card) => card.player === playerIndex && card.cubit === cubit,
-    )
-    return entry ? toCardId(entry.card) : null
+    const cell = state.cardsOnField[playerIndex]?.[cubit] ?? null
+    return cell === null ? null : toCardId(cell)
   }
 
   const restart = () => {
@@ -104,13 +143,13 @@ export const GamePage = () => {
           <QubitSlot
             key={`${owner}-${index}`}
             slot={slot}
-            ready={myTurn}
+            ready={myTurn || awaitingSecond}
             selected={
               selectedTarget !== null &&
               selectedTarget.player === playerIndex &&
               selectedTarget.cubit === index
             }
-            disabled={!myTurn}
+            disabled={!myTurn && !awaitingSecond}
             card={fieldCardAt(playerIndex, index)}
             onClick={() => onSlotClick(playerIndex, index)}
           />
@@ -142,24 +181,44 @@ export const GamePage = () => {
         <section className={s.playersBar}>
           <div className={s.playersRow}>
             <div className={`${s.playerCard} ${myTurn ? s.playerCardActive : ''}`}>
-              <div className={s.playerAvatar} onClick={() => setChoiceOpen(true)}>{avatar}</div>
+              <div className={s.playerAvatar}>{avatar}</div>
               <span className={s.playerName}>{nicknameOf(myId)}</span>
-              <span className={`${s.playerStatus} ${myTurn ? s.playerStatusActive : ''}`}>
-                {myTurn ? 'ВАШ ХОД' : 'ЖДИТЕ'}
-              </span>
+              {skipsNext(myIndex) && <span className={s.playerStatusSkip}>пропустит ход</span>}
+            </div>
+            <div className={s.playedCounter}>
+              <span className={s.playedCounterValue}>{state ? state.playedCards : 0}/2</span>
+              <span className={s.playedCounterLabel}>карты</span>
+              {state !== null && (
+                <span className={`${s.playedCounterTurn} ${myTurn ? s.playedCounterTurnActive : ''}`}>
+                  {myTurn ? 'ваш ход' : 'ход другого игрока'}
+                </span>
+              )}
             </div>
             <div className={`${s.playerCard} ${!myTurn && state ? s.playerCardActive : ''}`}>
-              <div className={s.playerAvatar} onClick={() => setChoiceOpen(true)}>{avatar}</div>
+              <div className={s.playerAvatar}>{avatar}</div>
               <span className={s.playerName}>{nicknameOf(opponentId)}</span>
-              <span className={`${s.playerStatus} ${!myTurn && state ? s.playerStatusActive : ''}`}>
-                {!myTurn && state ? 'ВАШ ХОД' : 'ЖДИТЕ'}
-              </span>
+              {skipsNext(otherIndex) && <span className={s.playerStatusSkip}>пропустит ход</span>}
             </div>
           </div>
         </section>
 
+        {awaitingSecond && (
+          <div className={s.awaitBanner}>
+            Карта «{needsInput.card}»: выберите второй кубит
+          </div>
+        )}
+
+        {state !== null && state.kronecker !== null && (
+          <div className={s.awaitBanner}>
+            Кронекер-пара: {state.kronecker.cardsPlayed === 0 ? 'ожидает первую карту' : 'ожидает вторую карту'}
+            {state.kronecker.registers.length > 0
+              ? ` — регистры: ${state.kronecker.registers.map((r) => nicknameOf(started.players[r])).join(', ')}`
+              : ' — регистры не ограничены'}
+          </div>
+        )}
+
         <section className={s.targetSection}>
-          <span className={s.sectionLabel}>Цель · {started.cubitCount} кубита</span>
+          <span className={s.sectionLabel}>Цель · {cubitCountLabel(started.cubitCount)}</span>
           <div className={s.targetRow}>
             {targetFaces.map((face, i) => {
               const dice = parseDiceFace(face)
@@ -180,16 +239,26 @@ export const GamePage = () => {
         </section>
       </main>
 
-      {choiceOpen && (
+      {needsInput?.need === 'face' && (
         <DiceChoiceModal
-          title="Выберите состояние кубита"
-          options={[...DICE_STATES]}
-          onSelect={(state) => {
-            console.log('Выбран кубит:', state)
-            setChoiceOpen(false)
+          title="Выберите грань"
+          options={toDiceOptions(needsInput.faces)}
+          onSelect={(dice) => {
+            cardInput({ face: diceFaceOf(dice) })
           }}
-          onClose={() => setChoiceOpen(false)}
+          // Пока карта ждёт ввода, сервер игнорирует selectTarget — закрыть
+          // без выбора не даём, ввод обязателен для продолжения игры.
+          onClose={() => {}}
         />
+      )}
+
+      {cantPlay !== null && (
+        <Modal title="Невозможно сыграть карту" onClose={dismissCantPlay}>
+          <p className={s.modalText}>{CANT_PLAY_REASONS[cantPlay] ?? cantPlay}</p>
+          <div className={s.modalActions}>
+            <Button type="primary" onClick={dismissCantPlay}>Понятно</Button>
+          </div>
+        </Modal>
       )}
 
       {menuOpen && (

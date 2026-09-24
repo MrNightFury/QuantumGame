@@ -101,6 +101,51 @@
     color: #9db2ff;
 }
 
+.playerStatusSkip {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #ffcc66;
+}
+
+.playedCounter {
+    display: flex;
+    flex: 0 0 4.5rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0;
+}
+
+.playedCounterValue {
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #ffffff;
+}
+
+.playedCounterLabel {
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.playedCounterTurn {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.playedCounterTurnActive {
+    color: #9db2ff;
+}
+
 .turnTimer {
     display: flex;
     flex: 0 0 4.5rem;
@@ -136,6 +181,18 @@
 .targetSection {
     flex-shrink: 0;
     width: 100%;
+}
+
+.awaitBanner {
+    flex-shrink: 0;
+    padding: 0.45rem 0.9rem;
+    border-radius: 0.75rem;
+    background: rgba(157, 178, 255, 0.12);
+    color: #9db2ff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-align: center;
 }
 
 .sectionLabel {

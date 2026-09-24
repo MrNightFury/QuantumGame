@@ -5,6 +5,7 @@
 #include <WebSocketsServer.h>
 #include <functional>
 #include <vector>
+#include <map>
 
 // WebSocket controller with a JSON text protocol.
 //
@@ -38,6 +39,10 @@ class WSController {
         void send(uint8_t clientId, const char *event, JsonVariantConst data);
         void broadcast(const char *event, JsonVariantConst data);
 
+        // Display name of the client: the custom one if set, else
+        // "player<id>".
+        String nameOf(uint8_t clientId) const;
+
     private:
         struct Subscription {
             String event;
@@ -54,7 +59,11 @@ class WSController {
         void sendUserConnected(uint8_t clientId);
         void sendUserDisconnected(uint8_t clientId);
 
+        bool nameTaken(const String &name, uint8_t clientId) const;
+        void setUserName(uint8_t clientId, const String &name);
+
         WebSocketsServer server;
         std::vector<uint8_t> onlineUsers;
+        std::map<uint8_t, String> userNames;
         std::vector<Subscription> subscriptions;
 };

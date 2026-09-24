@@ -73,9 +73,15 @@ if ($SkipUpload) {
     Write-Host "== pio run -d $controllerDir -t uploadfs ==" -ForegroundColor Cyan
     # PS 5.1: with $ErrorActionPreference=Stop a direct `& $pio ... 2>&1`
     # turns the first stderr line into a terminating NativeCommandError.
-    # Merge the streams inside cmd instead.
-    $uploadOutput = cmd /c "`"$pio`" run -d `"$controllerDir`" -t uploadfs 2>&1"
-    $uploadOutput | ForEach-Object { "$_" }
+    # Merge the streams inside cmd instead. Piping (instead of assigning
+    # first) streams the lines as they arrive; they are also collected for
+    # the error checks below.
+    $uploadOutput = New-Object System.Collections.Generic.List[string]
+    cmd /c "`"$pio`" run -d `"$controllerDir`" -t uploadfs 2>&1" |
+        ForEach-Object {
+            Write-Host "$_"
+            $uploadOutput.Add("$_")
+        }
     if ($LASTEXITCODE -ne 0) {
         throw "uploadfs failed"
     }

@@ -5,14 +5,14 @@ namespace {
 // (rows: X, Y, Z). Faces lying on the rotation axis map to themselves.
 //   X: "i" -> "0" -> "-i" -> "1" -> "i"
 //   Y: "+" -> "1" -> "-" -> "0" -> "+"
-//   Z: "+" -> "-i" -> "-" -> "i" -> "+"  (defined; X and Y follow the
+//   Z: "+" -> "i" -> "-" -> "-i" -> "+"  (defined; X and Y follow the
 //       same rotation direction of the cube)
 const Game::Die::Face ROTATE_PLUS_90[3][6] = {
     {Game::Die::Face::Plus, Game::Die::Face::Minus, Game::Die::Face::Zero, Game::Die::Face::One, Game::Die::Face::MinusI, Game::Die::Face::PlusI},
     {Game::Die::Face::One, Game::Die::Face::Zero, Game::Die::Face::PlusI, Game::Die::Face::MinusI, Game::Die::Face::Plus, Game::Die::Face::Minus},
-    {Game::Die::Face::MinusI, Game::Die::Face::PlusI, Game::Die::Face::Plus, Game::Die::Face::Minus, Game::Die::Face::Zero, Game::Die::Face::One},
+    {Game::Die::Face::PlusI, Game::Die::Face::MinusI, Game::Die::Face::Minus, Game::Die::Face::Plus, Game::Die::Face::Zero, Game::Die::Face::One},
 };
-} // namespace
+} // namespace  { Plus, Minus, PlusI, MinusI, Zero, One };
 
 namespace Game {
 

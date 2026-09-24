@@ -88,7 +88,7 @@ void GameController::handleTag(const NfcScanner::TagEvent &event) {
     Serial.printf("[Game] Card %s\n", CardRegistry::toString(type));
 
     if (gameState->isCardPlayed(event.uid, event.uidLength) && false) { // TODO: remove the && false when we want to enforce one-time use of cards
-        Serial.println("[Game] Card ignored, already played this game");
+        refusePlay("alreadyPlayed");
         return;
     }
     if (pendingPlayActive) {
@@ -98,14 +98,61 @@ void GameController::handleTag(const NfcScanner::TagEvent &event) {
 
     CardRequirement requirement = cardRequirement(type);
 
+    // The kronecker card takes no card slot: it only arms the pair mode,
+    // the next two cards will share a single slot.
+    if (type == CardRegistry::CardType::KroneckerMultiplication) {
+        if (kroneckerActive) {
+            refusePlay("kroneckerAlreadyActive");
+            return;
+        }
+        kroneckerActive = true;
+        kroneckerPairCards = 0;
+        kroneckerRegisters.clear();
+        Serial.println("[Game] Kronecker pair armed");
+        commitCard(type, event.uid, event.uidLength, CardParams());
+        return;
+    }
+
+    // For cards without a target the reason never depends on the aim.
+    // Inside a kronecker pair the turn counter does not grow yet, so the
+    // pair progress is passed along for the identityFirst check.
+    const char *reason = cantPlayReason(type, *gameState, target,
+                                        kroneckerActive ? kroneckerPairCards : 0);
+
     // Cards that need no aim apply on their own.
     if (requirement == CardRequirement::None) {
+        if (reason != nullptr) {
+            refusePlay(reason);
+            return;
+        }
         commitCard(type, event.uid, event.uidLength, CardParams());
         return;
     }
 
     if (!hasTarget) {
         Serial.println("[Game] Card ignored, no target selected");
+        return;
+    }
+
+    // The second card of a kronecker pair must hit a register the first
+    // card bound the pair to (no restriction while the list is empty).
+    if (kroneckerActive && kroneckerPairCards == 1 && !kroneckerRegisters.empty()) {
+        bool registerAllowed = false;
+        for (size_t reg : kroneckerRegisters) {
+            if (reg == target.player) {
+                registerAllowed = true;
+                break;
+            }
+        }
+        if (!registerAllowed) {
+            refusePlay("registerMismatch");
+            return;
+        }
+    }
+
+    // Some cards cannot be played on the chosen cubit at all.
+    if (reason != nullptr) {
+        refusePlay(reason);
         return;
     }
 
@@ -168,6 +215,9 @@ void GameController::startGame(JsonVariantConst data) {
     isGameOn = true;
     hasTarget = false;
     pendingPlayActive = false;
+    kroneckerActive = false;
+    kroneckerPairCards = 0;
+    kroneckerRegisters.clear();
     Serial.printf("[Game] Game started: %u players, %u dice\n",
                   (unsigned int)playerIds.size(), (unsigned int)diceCount);
 
@@ -262,26 +312,61 @@ bool GameController::commitCard(CardRegistry::CardType type,
     }
     gameState->playedCardUids.emplace_back(uid, uid + uidLength);
     // Record the card in the history of every cubit it affected (the whole
-    // window for the x3 cards).
-    size_t cubits[3];
-    size_t cubitCount = affectedCubits(type, *gameState, params.primary, cubits, 3);
-    for (size_t i = 0; i < cubitCount; i++) {
-        gameState->cardHistory[params.primary.player][cubits[i]].push_back(type);
-    }
+    // window for the x3 cards, both dice for swap).
+    recordPlayedCards(type, *gameState, params);
     hasTarget = false;  // the chosen cubit is consumed by the card
+
+    // Card slot accounting. A kronecker card itself is free; the two cards
+    // after it share a single slot, so the counter grows only once, when
+    // the pair completes.
+    if (type != CardRegistry::CardType::KroneckerMultiplication) {
+        if (kroneckerActive && kroneckerPairCards == 0) {
+            // First card of the pair: it binds the pair to every register
+            // it involved (a targetless card binds none, the pair stays
+            // unrestricted). No slot is spent yet.
+            kroneckerPairCards = 1;
+            kroneckerRegisters.clear();
+            if (needsTarget(type)) {
+                kroneckerRegisters.push_back(params.primary.player);
+                if (params.hasSecond && params.second.player != params.primary.player) {
+                    kroneckerRegisters.push_back(params.second.player);
+                }
+            }
+        } else if (kroneckerActive) {
+            // Second card of the pair: complete, one slot for two cards.
+            kroneckerActive = false;
+            kroneckerPairCards = 0;
+            kroneckerRegisters.clear();
+            gameState->playedCards++;
+        } else {
+            gameState->playedCards++;
+        }
+    }
 
     // Two cards per turn
     // Pass the turn before notifying the players
-    gameState->playedCards++;
     if (gameState->playedCards >= GameState::CARDS_PER_TURN) {
         gameState->currentPlayer =
             (gameState->currentPlayer + 1) % gameState->playerIds.size();
+        // A barrier flag makes the player skip their turn: keep advancing
+        // while the current player is flagged, consuming one flag each.
+        while (gameState->skipNextTurn[gameState->currentPlayer]) {
+            gameState->skipNextTurn[gameState->currentPlayer] = false;
+            gameState->currentPlayer =
+                (gameState->currentPlayer + 1) % gameState->playerIds.size();
+        }
         gameState->playedCards = 0;
     }
 
     JsonDocument playedDoc;
-    playedDoc["target"]["register"] = params.primary.player;
-    playedDoc["target"]["cubit"] = params.primary.cubit;
+    if (needsTarget(type)) {
+        playedDoc["target"]["register"] = params.primary.player;
+        playedDoc["target"]["cubit"] = params.primary.cubit;
+    } else {
+        // Cards without an aim (identity, reshuffle, barrier, kronecker)
+        // are not aimed at a cubit.
+        playedDoc["target"] = nullptr;
+    }
     playedDoc["card"] = CardRegistry::toString(type);
 
     JsonDocument stateDoc = buildGameStateDoc();
@@ -330,6 +415,7 @@ void GameController::cardInput(uint8_t clientId, JsonVariantConst data) {
         JsonVariantConst cubit = data["secondTarget"]["cubit"];
         if (!player.is<unsigned int>() || !cubit.is<unsigned int>()) {
             Serial.println("[Game] cardInput has invalid second target");
+            refusePlay("invalidSecondTarget");
             return;
         }
         size_t playerIndex = player.as<size_t>();
@@ -337,14 +423,33 @@ void GameController::cardInput(uint8_t clientId, JsonVariantConst data) {
         if (playerIndex >= state.registers.size() ||
             cubitIndex >= state.registers[playerIndex].dice.size()) {
             Serial.println("[Game] cardInput second target outside the registers");
+            refusePlay("invalidSecondTarget");
             return;
         }
         params.hasSecond = true;
         params.second = {playerIndex, cubitIndex};
+
+        // A swap that closes a kronecker pair must keep its second target
+        // inside the registers the first card bound the pair to.
+        if (kroneckerActive && kroneckerPairCards == 1 && !kroneckerRegisters.empty()) {
+            bool registerAllowed = false;
+            for (size_t reg : kroneckerRegisters) {
+                if (reg == params.second.player) {
+                    registerAllowed = true;
+                    break;
+                }
+            }
+            if (!registerAllowed) {
+                Serial.println("[Game] cardInput second target outside the kronecker pair registers");
+                refusePlay("registerMismatch");
+                return;
+            }
+        }
     } else if (requirement == CardRequirement::TargetAndFace) {
         JsonVariantConst faceName = data["face"];
         if (!faceName.is<const char *>()) {
             Serial.println("[Game] cardInput has invalid face");
+            refusePlay("invalidFace");
             return;
         }
         Die::Face faceBuf[6];
@@ -359,6 +464,7 @@ void GameController::cardInput(uint8_t clientId, JsonVariantConst data) {
         }
         if (!found) {
             Serial.println("[Game] cardInput face not allowed");
+            refusePlay("invalidFace");
             return;
         }
         params.hasFace = true;
@@ -396,6 +502,9 @@ void GameController::giveUp(uint8_t clientId) {
         isGameOn = false;
         hasTarget = false;
         pendingPlayActive = false;
+        kroneckerActive = false;
+        kroneckerPairCards = 0;
+        kroneckerRegisters.clear();
         Serial.println("[Game] Sole player gave up, game stopped");
         return;
     }
@@ -411,10 +520,13 @@ void GameController::endGame(size_t winnerIndex) {
     isGameOn = false;
     hasTarget = false;
     pendingPlayActive = false;
+    kroneckerActive = false;
+    kroneckerPairCards = 0;
+    kroneckerRegisters.clear();
 
     // Same naming as the online users list.
-    String winnerName = "player";
-    winnerName += winnerId;
+    // The winner's display name (custom if set, else "player<id>").
+    String winnerName = ws.nameOf(winnerId);
 
     JsonDocument endedDoc;
     endedDoc["winnerId"] = winnerId;
@@ -422,6 +534,17 @@ void GameController::endGame(size_t winnerIndex) {
     for (uint8_t id : gameState->playerIds) {
         ws.send(id, "gameEnded", endedDoc);
     }
+}
+
+void GameController::refusePlay(const char *reason) {
+    hasTarget = false;
+    pendingPlayActive = false;
+    Serial.printf("[Game] Card refused: %s\n", reason);
+
+    JsonDocument reasonDoc;
+    reasonDoc.set(reason);
+    ws.send(gameState->playerIds[gameState->currentPlayer], "cantPlay",
+            reasonDoc);
 }
 
 JsonDocument GameController::buildGameStateDoc() const {
@@ -447,25 +570,46 @@ JsonDocument GameController::buildGameStateDoc() const {
         target.add(die.faceString());
     }
 
-    // Only the last card played on each cubit is sent; the controller keeps
-    // the full history in GameState::cardHistory.
+    // cardsOnField is a matrix aligned with registers: per player, per cubit,
+    // the name of the last card played there, or null when none. The
+    // controller keeps the full history in GameState::cardHistory.
     JsonArray fieldCards = doc["cardsOnField"].to<JsonArray>();
     for (size_t player = 0; player < state.cardHistory.size(); player++) {
+        JsonArray cubitCards = fieldCards.add<JsonArray>();
         for (size_t cubit = 0; cubit < state.cardHistory[player].size(); cubit++) {
             const std::vector<CardRegistry::CardType> &history =
                 state.cardHistory[player][cubit];
             if (history.empty()) {
-                continue;
+                cubitCards.add(nullptr);
+            } else {
+                cubitCards.add(CardRegistry::toString(history.back()));
             }
-            JsonObject cardObj = fieldCards.add<JsonObject>();
-            cardObj["player"] = player;
-            cardObj["cubit"] = cubit;
-            cardObj["card"] = CardRegistry::toString(history.back());
         }
     }
 
     doc["currentPlayer"] = state.currentPlayer;
     doc["playedCards"] = state.playedCards;
+
+    // Per-player barrier flags: the flagged players skip their next turn.
+    JsonArray skips = doc["skipNextTurn"].to<JsonArray>();
+    for (bool skip : state.skipNextTurn) {
+        skips.add(skip);
+    }
+
+    // Kronecker pair in progress: the registers the pair is bound to and
+    // how many of its two cards are applied. An empty register list means
+    // the first card is not played yet (or bound nothing) - any register
+    // goes for the remaining cards. null when no pair is armed.
+    if (kroneckerActive) {
+        JsonObject kronecker = doc["kronecker"].to<JsonObject>();
+        JsonArray registers = kronecker["registers"].to<JsonArray>();
+        for (size_t reg : kroneckerRegisters) {
+            registers.add(reg);
+        }
+        kronecker["cardsPlayed"] = kroneckerPairCards;
+    } else {
+        doc["kronecker"] = nullptr;
+    }
     return doc;
 }
 

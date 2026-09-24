@@ -29,6 +29,11 @@ struct GameState {
     // in play order; a future card will be able to undo the last one.
     std::vector<std::vector<std::vector<CardRegistry::CardType>>> cardHistory;
 
+    // Per-player flags (aligned with playerIds): a player flagged here skips
+    // their next turn. Set by the barrier card; each flag is consumed when
+    // the turn passes over the flagged player.
+    std::vector<bool> skipNextTurn;
+
     // Whether the tag uid has already been played in this game.
     bool isCardPlayed(const uint8_t *uid, uint8_t uidLength) const;
 

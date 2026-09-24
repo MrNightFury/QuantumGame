@@ -3,12 +3,8 @@
 #include <algorithm>
 
 namespace {
-    // Placeholder name generator
-    String userName(uint8_t clientId) {
-        String name = "player";
-        name += clientId;
-        return name;
-    }
+    // Names are truncated to this length.
+    const size_t NAME_MAX_LENGTH = 32;
 }
 
 WSController::WSController(uint16_t port) : server(port) {
@@ -89,6 +85,7 @@ void WSController::handleDisconnected(uint8_t clientId) {
     if (it != onlineUsers.end()) {
         onlineUsers.erase(it);
     }
+    userNames.erase(clientId);
     Serial.printf("[WS] client %u disconnected (%u online)\n", (unsigned)clientId, (unsigned)onlineUsers.size());
     sendUserDisconnected(clientId);
 }
@@ -107,6 +104,14 @@ void WSController::handleText(uint8_t clientId, const uint8_t *payload, size_t l
         return;
     }
 
+    if (eventField.as<String>() == "setPlayerName") {
+        JsonVariantConst dataField = doc["data"];
+        if (!dataField.is<const char *>()) {
+            Serial.printf("[WS] dropping setPlayerName message without string data field from client %u\n", (unsigned)clientId);
+            return;
+        }
+        setUserName(clientId, dataField.as<String>());
+    }
     dispatch(clientId, eventField.as<String>(), doc["data"]);
 }
 
@@ -131,7 +136,7 @@ void WSController::sendOnlineUsers(uint8_t clientId) {
     for (size_t i = 0; i < onlineUsers.size(); i++) {
         JsonObject user = users.add<JsonObject>();
         user["id"] = onlineUsers[i];
-        user["name"] = userName(onlineUsers[i]);
+        user["name"] = nameOf(onlineUsers[i]);
     }
 
     send(clientId, "setOnlineUsers", data);
@@ -141,7 +146,7 @@ void WSController::sendUserConnected(uint8_t clientId) {
     JsonDocument data;
     JsonObject user = data.to<JsonObject>();
     user["id"] = clientId;
-    user["name"] = userName(clientId);
+    user["name"] = nameOf(clientId);
 
     for (size_t i = 0; i < onlineUsers.size(); i++) {
         if (onlineUsers[i] != clientId) {
@@ -155,4 +160,77 @@ void WSController::sendUserDisconnected(uint8_t clientId) {
     data = clientId;
 
     broadcast("removeOnlineUser", data);
+}
+
+String WSController::nameOf(uint8_t clientId) const {
+    auto it = userNames.find(clientId);
+    if (it != userNames.end()) {
+        return it->second;
+    } else {
+        String name = "player";
+        name += clientId;
+        return name;
+    }
+}
+
+bool WSController::nameTaken(const String &name, uint8_t clientId) const {
+    for (const auto &pair : userNames) {
+        if (pair.first != clientId && pair.second == name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Name rules: empty names are ignored; the name is truncated to
+// NAME_MAX_LENGTH chars; names shaped like the automatic "player<id>"
+// fallback are not allowed; a taken name gets a number suffix ("Name2",
+// "Name3", ...). A rename is announced to everyone (including the renamed
+// client) with "removeOnlineUser" followed by "addOnlineUser".
+void WSController::setUserName(uint8_t clientId, const String &name) {
+    if (name.length() == 0) {
+        return;
+    }
+
+    String base = name.substring(0, NAME_MAX_LENGTH);
+
+    // "player<number>" is the automatic fallback namespace - a client
+    // cannot claim it.
+    if (base.startsWith("player")) {
+        String suffix = base.substring(6);
+        bool isNumber = suffix.length() > 0;
+        for (size_t i = 0; i < suffix.length() && isNumber; i++) {
+            if (!isDigit(suffix[i])) {
+                isNumber = false;
+            }
+        }
+        if (isNumber) {
+            base = "player" + String(clientId);
+        }
+    }
+
+    // Make room for the suffix inside the length limit, then find the first
+    // free variant.
+    String newName = base;
+    for (unsigned int attempt = 2; nameTaken(newName, clientId); attempt++) {
+        String suffix = String(attempt);
+        newName = base.substring(0, NAME_MAX_LENGTH - suffix.length()) + suffix;
+    }
+
+    String current = nameOf(clientId);
+    if (newName == current) {
+        return;
+    }
+    userNames[clientId] = newName;
+    Serial.printf("[WS] client %u renamed to %s\n", (unsigned)clientId, newName.c_str());
+
+    // Announce the rename: the old entry leaves, the new one arrives.
+    JsonDocument removed;
+    removed = clientId;
+    broadcast("removeOnlineUser", removed);
+
+    JsonDocument added;
+    added["id"] = clientId;
+    added["name"] = newName;
+    broadcast("addOnlineUser", added);
 }

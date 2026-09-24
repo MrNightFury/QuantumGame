@@ -5,6 +5,7 @@ import s from "./HomePage.module.css";
 import { Bell } from "lucide-react";
 import { getConnectionState, subscribeConnection } from "../../api/connection";
 import { startGame } from "../../api/game";
+import { cubitCountLabel } from "../../lib/plural";
 import type { OnlineUser } from "../../api/events";
 import { QUBIT_COUNT_OPTIONS, type QubitCount } from "../../types/qubitDemo";
 import { useNavigate } from "react-router-dom";
@@ -107,7 +108,7 @@ export const HomePage = () => {
                 </div>
                 <div className={s.difficultyBlock}>
                     <span className={s.difficultyLabel}>Сложность</span>
-                    <span className={s.difficultyHint}>{qubitCount} кубита на поле</span>
+                    <span className={s.difficultyHint}>{cubitCountLabel(qubitCount)} на поле</span>
                     <div className={s.difficultyRow}>
                         {QUBIT_COUNT_OPTIONS.map((n) => (
                             <button

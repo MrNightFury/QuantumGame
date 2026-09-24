@@ -4,17 +4,44 @@ import s from './ProfilePage.module.css';
 import { useNavigate } from 'react-router-dom';
 import { MOCK_PROFILE } from '../../data/mock';
 import type { AuthorizedUser } from '../../types/profile';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { Modal } from '../../components/Modal/Modal';
+import { getConnectionState, subscribeConnection, setPlayerName } from '../../api/connection';
 
 export const ProfilePage = () => {
     const navigate = useNavigate();
     const profile: AuthorizedUser = MOCK_PROFILE;
+    const { userId, onlineUsers } = useSyncExternalStore(subscribeConnection, getConnectionState);
 
+    // Ник как на странице онлайна (player+id). Черновик переименования валиден,
+    // пока подтверждённое имя не менялось (base) или сервер временно снял его
+    // (removeOnlineUser перед addOnlineUser — см. setPlayerName в EVENTS.md).
+    // Когда приходит новое подтверждённое имя (возможно, обрезанное до 32
+    // символов или с суффиксом при занятом), черновик замещается им.
+    const confirmedName = onlineUsers.find((user) => user.id === userId)?.name ?? null;
+    const [draft, setDraft] = useState<{ value: string; base: string | null } | null>(null);
+    const isDraftValid = draft !== null && (confirmedName === null || confirmedName === draft.base);
+    const displayedNickname = (isDraftValid ? draft.value : null) ?? confirmedName ?? 'Игрок';
     const [isEditMode, setIsEditMode] = useState(false);
-    const [profileNickname, setProfileNickname] = useState(profile.nickname);
+
+    const handleOpenEdit = () => {
+        setDraft({ value: displayedNickname, base: confirmedName });
+        setIsEditMode(true);
+    };
+
+    const handleCloseEdit = () => {
+        setDraft(null);
+        setIsEditMode(false);
+    };
 
     const handleSaveProfile = () => {
+        const nextName = (draft?.value ?? '').trim();
+        // Пустая строка игнорируется сервером (EVENTS.md); false от отправки —
+        // нет соединения. В обоих случаях откатываемся на подтверждённое имя.
+        const sent = nextName !== '' && setPlayerName(nextName);
+        if (!sent) {
+            setDraft(null);
+        }
         setIsEditMode(false);
     };
 
@@ -49,12 +76,12 @@ export const ProfilePage = () => {
                         </div>
                         <div className={s.profileInfoTitle}>
                             <div className={s.profileInfoTitleContainer}>
-                                <h2 className={s.profileInfoTitle}>{profileNickname}</h2>
-                                <div className={s.profileInfoTitleEditButton} onClick={() => setIsEditMode(true)}>
+                                <h2 className={s.profileInfoTitle}>{displayedNickname}</h2>
+                                <div className={s.profileInfoTitleEditButton} onClick={handleOpenEdit}>
                                     <Pencil className={s.profileInfoTitleEditIcon} />
                                 </div>
                             </div>
-                            <span className={s.profileInfoTitleId}>#{profile.id}</span>
+                            <span className={s.profileInfoTitleId}>#{userId ?? '—'}</span>
                         </div>
                     </div>
 
@@ -66,7 +93,7 @@ export const ProfilePage = () => {
                         </div>
                         <div className={s.profileInfoItem}>
                             <Flag color="#FFD700" />
-                            <h3 className={s.profileInfoItemValue}>{profile.winsAmount}</h3>
+                            <h3 className={s.profileInfoItemValue}>WIP</h3>
                             <span className={s.profileInfoItemLabel}>Победы</span>
                         </div>
                     </div>
@@ -74,11 +101,11 @@ export const ProfilePage = () => {
             </main>
 
             {isEditMode && (
-                <Modal title="Редактирование профиля" onClose={() => setIsEditMode(false)}>
+                <Modal title="Редактирование профиля" onClose={handleCloseEdit}>
                     <div className={s.profileInfoEditModalContent}>
                         <div className={s.profileInfoEditModalItem}>
                             <label className={s.profileInfoEditModalLabel}>Никнейм</label>
-                            <input className={s.profileInfoEditModalInput} type="text" placeholder="Никнейм" value={profileNickname} onChange={(e) => setProfileNickname(e.target.value)} />
+                            <input className={s.profileInfoEditModalInput} type="text" placeholder="Никнейм" maxLength={32} value={draft?.value ?? ''} onChange={(e) => setDraft({ value: e.target.value, base: draft?.base ?? confirmedName })} />
                         </div>
                         <Button type="primary" onClick={handleSaveProfile}>Сохранить</Button>
                     </div>

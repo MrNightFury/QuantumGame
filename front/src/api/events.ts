@@ -1,5 +1,5 @@
 /**
- * Контракт WebSocket-событий: ../controller/EVENTS.md.
+ * Контракт WebSocket-событий: ../../EVENTS.md (корень workspace).
  * Конверт: {"event": "<название>", "data": <структура>}.
  * Файл контракта меняется параллельно — держать в sync.
  */
@@ -14,13 +14,12 @@ export interface GameStartedData {
   cubitCount: number
 }
 
-export interface FieldCardData {
-  /** Индекс игрока в списке players. */
-  player: number
-  /** Индекс кубита в ряду игрока. */
-  cubit: number
-  /** Имя типа карты (совпадает с CardId). */
-  card: string
+/** Активная пара kronecker_multiplication (поле kronecker события setGameState). */
+export interface KroneckerState {
+  /** Регистры, заданные первой картой пары (индексы по players). Пусто — пара не ограничена. */
+  registers: number[]
+  /** Сколько карт пары применено: 0 или 1. */
+  cardsPlayed: number
 }
 
 export interface GameStateData {
@@ -29,7 +28,15 @@ export interface GameStateData {
   targetRegister: string[]
   currentPlayer: number
   playedCards: number
-  cardsOnField: FieldCardData[]
+  /** Выровнено с players: помеченный барьером игрок пропустит следующий ход. */
+  skipNextTurn: boolean[]
+  /** Активная пара kronecker_multiplication или null, когда пара не активна. */
+  kronecker: KroneckerState | null
+  /**
+   * Матрица, выровненная с registers: для каждого игрока массив по кубитам,
+   * в ячейке — имя последней карты, сыгранной на кубит, или null.
+   */
+  cardsOnField: (string | null)[][]
 }
 
 export interface CardPlayedTarget {
@@ -38,7 +45,11 @@ export interface CardPlayedTarget {
 }
 
 export interface CardPlayedData {
-  target: CardPlayedTarget
+  /**
+   * Первая цель карты. null для карт без цели (identity, reshuffle, barrier,
+   * kronecker_multiplication) — см. EVENTS.md.
+   */
+  target: CardPlayedTarget | null
   card: string
 }
 
@@ -53,6 +64,15 @@ export interface CardScannedData {
   type?: string
 }
 
+export interface CardNeedsInputData {
+  /** Название карты, ждущей ввод. */
+  card: string
+  /** Что требуется: вторая цель или выбор грани. */
+  need: 'secondTarget' | 'face'
+  /** Допустимые грани (строки протокола). Присутствует при need === 'face'. */
+  faces?: string[]
+}
+
 export type ServerEvent =
   | { event: 'setId'; data: number }
   | { event: 'setOnlineUsers'; data: OnlineUser[] }
@@ -64,6 +84,8 @@ export type ServerEvent =
   | { event: 'gameEnded'; data: GameEndedData }
   | { event: 'cardScanned'; data: CardScannedData }
   | { event: 'cardWritten'; data: null }
+  | { event: 'cardNeedsInput'; data: CardNeedsInputData }
+  | { event: 'cantPlay'; data: string }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -77,6 +99,27 @@ function isStringMatrix(value: unknown): value is string[][] {
   return (
     Array.isArray(value) &&
     value.every((row) => Array.isArray(row) && row.every((cell) => typeof cell === 'string'))
+  )
+}
+
+function isNullableStringMatrix(value: unknown): value is (string | null)[][] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (row) => Array.isArray(row) && row.every((cell) => cell === null || typeof cell === 'string'),
+    )
+  )
+}
+
+function isBooleanArray(value: unknown): value is boolean[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'boolean')
+}
+
+function isKroneckerState(value: unknown): value is KroneckerState {
+  return (
+    isRecord(value) &&
+    isNumberArray(value.registers) &&
+    (value.cardsPlayed === 0 || value.cardsPlayed === 1)
   )
 }
 
@@ -95,20 +138,6 @@ function isGameStartedData(value: unknown): value is GameStartedData {
     typeof value.cubitCount === 'number'
   )
 }
-
-function isFieldCardData(value: unknown): value is FieldCardData {
-  return (
-    isRecord(value) &&
-    typeof value.player === 'number' &&
-    typeof value.cubit === 'number' &&
-    typeof value.card === 'string'
-  )
-}
-
-function isFieldCardList(value: unknown): value is FieldCardData[] {
-  return Array.isArray(value) && value.every(isFieldCardData)
-}
-
 function isGameStateData(value: unknown): value is GameStateData {
   return (
     isRecord(value) &&
@@ -118,7 +147,9 @@ function isGameStateData(value: unknown): value is GameStateData {
     value.targetRegister.every((cell) => typeof cell === 'string') &&
     typeof value.currentPlayer === 'number' &&
     typeof value.playedCards === 'number' &&
-    isFieldCardList(value.cardsOnField)
+    isBooleanArray(value.skipNextTurn) &&
+    (value.kronecker === null || isKroneckerState(value.kronecker)) &&
+    isNullableStringMatrix(value.cardsOnField)
   )
 }
 
@@ -127,7 +158,11 @@ function isCardPlayedTarget(value: unknown): value is CardPlayedTarget {
 }
 
 function isCardPlayedData(value: unknown): value is CardPlayedData {
-  return isRecord(value) && isCardPlayedTarget(value.target) && typeof value.card === 'string'
+  return (
+    isRecord(value) &&
+    (value.target === null || isCardPlayedTarget(value.target)) &&
+    typeof value.card === 'string'
+  )
 }
 
 function isGameEndedData(value: unknown): value is GameEndedData {
@@ -139,6 +174,16 @@ function isCardScannedData(value: unknown): value is CardScannedData {
     isRecord(value) &&
     typeof value.registered === 'boolean' &&
     (value.type === undefined || typeof value.type === 'string')
+  )
+}
+
+function isCardNeedsInputData(value: unknown): value is CardNeedsInputData {
+  return (
+    isRecord(value) &&
+    typeof value.card === 'string' &&
+    (value.need === 'secondTarget' || value.need === 'face') &&
+    (value.faces === undefined ||
+      (Array.isArray(value.faces) && value.faces.every((face) => typeof face === 'string')))
   )
 }
 
@@ -177,6 +222,11 @@ export function parseServerEvent(raw: unknown): ServerEvent | null {
       return data === null || (isRecord(data) && Object.keys(data).length === 0)
         ? { event, data: null }
         : null
+    case 'cardNeedsInput':
+      return isCardNeedsInputData(data) ? { event, data } : null
+    case 'cantPlay':
+      // data — текстовый id причины (см. таблицу в EVENTS.md).
+      return typeof data === 'string' ? { event, data } : null
     default:
       return null
   }

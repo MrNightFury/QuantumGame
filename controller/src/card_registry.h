@@ -14,14 +14,17 @@ public:
         PauliX, PauliY, PauliZ,
         PauliX3, PauliY3, PauliZ3,
 
-        RotateX, RotateY, RotateZ,
         PhaseForward, PhaseBackward,
+        RotateX, RotateY, RotateZ,
         Hadamard, Hadamard3,
         Swap,
+        QuantumNoise,
         KroneckerMultiplication,
         Measurement,
         Identity,
-        Reshuffle
+        Barrier,
+        Reshuffle,
+        QuantumLucky
     };
 
     struct Entry {
