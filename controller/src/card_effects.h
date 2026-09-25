@@ -66,6 +66,11 @@ bool undoLastCard(GameState &state, const Target &target);
 const char *cantPlayReason(CardRegistry::CardType type, const GameState &state,
                            const Target &target, size_t cardsPlayedInPair = 0);
 
+// True when the last card recorded on the cubit is a measurement: the
+// cubit is locked, only quantum noise may be played on it (it cancels
+// the measurement).
+bool cubitMeasured(const GameState &state, size_t player, size_t cubit);
+
 // Fills outFaces with the faces the card may set on the target die, given
 // the live state. Returns the number of faces (0 = the card cannot be
 // applied to this target). Rotate cards offer every face reachable around

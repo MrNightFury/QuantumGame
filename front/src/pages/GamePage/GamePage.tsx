@@ -53,6 +53,7 @@ const CANT_PLAY_REASONS: Record<string, string> = {
   kroneckerAlreadyActive: 'Кронекер-пара уже активна — сначала закройте её.',
   registerMismatch: 'Вторая карта пары должна попасть в те же регистры.',
   barrierAlreadySet: 'Следующий игрок уже помечен барьером.',
+  measured: 'Кубит закрыт измерением — выберите другую цель.',
 }
 
 function toSlots(faces: string[] | undefined): Slot[] {
@@ -202,6 +203,21 @@ export const GamePage = () => {
           </div>
         </section>
 
+        <section className={s.targetSection}>
+          <span className={s.sectionLabel}>Цель · {cubitCountLabel(started.cubitCount)}</span>
+          <div className={s.targetRow}>
+            {targetFaces.map((face, i) => {
+              const dice = parseDiceFace(face)
+              return (
+                <div className={s.targetDiceSlot} key={i}>
+                  {dice && <img className={s.targetDiceImage} src={getDiceImageUrl(dice)} alt="" />}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+
         {awaitingSecond && (
           <div className={s.awaitBanner}>
             Карта «{needsInput.card}»: выберите второй кубит
@@ -217,19 +233,14 @@ export const GamePage = () => {
           </div>
         )}
 
-        <section className={s.targetSection}>
-          <span className={s.sectionLabel}>Цель · {cubitCountLabel(started.cubitCount)}</span>
-          <div className={s.targetRow}>
-            {targetFaces.map((face, i) => {
-              const dice = parseDiceFace(face)
-              return (
-                <div className={s.targetDiceSlot} key={i}>
-                  {dice && <img className={s.targetDiceImage} src={getDiceImageUrl(dice)} alt="" />}
-                </div>
-              )
-            })}
+        {!awaitingSecond && !(state !== null && state.kronecker !== null) && (
+          <div className={s.awaitBanner} style={{ visibility: "hidden" }}>
+            ---
           </div>
-        </section>
+        )}
+
+        
+
 
         <section className={s.boardSection}>
           <div className={s.boardContainer}>

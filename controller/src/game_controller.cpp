@@ -429,6 +429,13 @@ void GameController::cardInput(uint8_t clientId, JsonVariantConst data) {
         params.hasSecond = true;
         params.second = {playerIndex, cubitIndex};
 
+        // The second die of a swap must not be measured either.
+        if (cubitMeasured(state, params.second.player, params.second.cubit)) {
+            Serial.println("[Game] cardInput second target is measured");
+            refusePlay("measured");
+            return;
+        }
+
         // A swap that closes a kronecker pair must keep its second target
         // inside the registers the first card bound the pair to.
         if (kroneckerActive && kroneckerPairCards == 1 && !kroneckerRegisters.empty()) {

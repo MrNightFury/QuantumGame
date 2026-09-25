@@ -59,6 +59,7 @@ CardRequirement cardRequirement(CardRegistry::CardType type) {
         case CardRegistry::CardType::PhaseForward:
         case CardRegistry::CardType::PhaseBackward:
         case CardRegistry::CardType::QuantumNoise:
+        case CardRegistry::CardType::Measurement:
             return CardRequirement::OneTarget;
         case CardRegistry::CardType::RotateX:
         case CardRegistry::CardType::RotateY:
@@ -164,6 +165,10 @@ bool applyCard(CardRegistry::CardType type, GameState &state, const CardParams &
             // Turn-flow card: the pair mode it arms is handled by the
             // controller (commitCard), the game state itself is unchanged.
             break;
+        case CardRegistry::CardType::Measurement:
+            // The measurement does not change the die: it locks the cubit
+            // (see cantPlayReason) until quantum noise cancels it.
+            break;
         default:
             break;
     }
@@ -178,6 +183,9 @@ bool isUndoable(CardRegistry::CardType type) {
         case CardRegistry::CardType::PhaseForward:
         case CardRegistry::CardType::PhaseBackward:
         case CardRegistry::CardType::Hadamard:
+        case CardRegistry::CardType::Measurement:
+            // Quantum noise cancels a measurement too: the marker has no
+            // dice effect, so its inverse is a no-op.
             return true;
         default:
             return false;
@@ -198,8 +206,32 @@ bool undoLastCard(GameState &state, const Target &target) {
     return true;
 }
 
+bool cubitMeasured(const GameState &state, size_t player, size_t cubit) {
+    const std::vector<CardRegistry::CardType> &history =
+        state.cardHistory[player][cubit];
+    return !history.empty() &&
+           history.back() == CardRegistry::CardType::Measurement;
+}
+
 const char *cantPlayReason(CardRegistry::CardType type, const GameState &state,
                            const Target &target, size_t cardsPlayedInPair) {
+    // A measured cubit is locked: every aimed card is refused, including
+    // x3 cards whose window merely touches it. Quantum noise is the only
+    // exception - it cancels the measurement. (Swap's second die is
+    // checked by the controller when the input arrives.)
+    if (type != CardRegistry::CardType::QuantumNoise && needsTarget(type)) {
+        if (cubitMeasured(state, target.player, target.cubit)) {
+            return "measured";
+        }
+        size_t cubits[3];
+        size_t count = affectedCubits(type, state, target, cubits, 3);
+        for (size_t i = 0; i < count; i++) {
+            if (cubitMeasured(state, target.player, cubits[i])) {
+                return "measured";
+            }
+        }
+    }
+
     switch (type) {
         case CardRegistry::CardType::PauliX3:
         case CardRegistry::CardType::PauliY3:
@@ -265,6 +297,7 @@ size_t affectedCubits(CardRegistry::CardType type, const GameState &state,
         case CardRegistry::CardType::RotateY:
         case CardRegistry::CardType::RotateZ:
         case CardRegistry::CardType::QuantumLucky:
+        case CardRegistry::CardType::Measurement:
             if (maxCubits >= 1) {
                 outCubits[0] = target.cubit;
                 count = 1;
