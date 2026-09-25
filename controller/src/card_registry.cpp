@@ -99,12 +99,12 @@ bool deserializeTable(const uint8_t *data, size_t length, std::vector<CardRegist
 } // namespace
 
 CardRegistry::CardRegistry() {
-    set(DEFAULT_PAULI_X_UID, sizeof(DEFAULT_PAULI_X_UID), CardType::PauliX);
-    set(DEFAULT_PAULI_Y_UID, sizeof(DEFAULT_PAULI_Y_UID), CardType::PauliY);
-    set(DEFAULT_PAULI_Z_UID, sizeof(DEFAULT_PAULI_Z_UID), CardType::PauliZ);
-    set(DEFAULT_PAULI_X3_UID, sizeof(DEFAULT_PAULI_X3_UID), CardType::PauliX3);
-    set(DEFAULT_PAULI_Y3_UID, sizeof(DEFAULT_PAULI_Y3_UID), CardType::PauliY3);
-    set(DEFAULT_PAULI_Z3_UID, sizeof(DEFAULT_PAULI_Z3_UID), CardType::PauliZ3);
+    // set(DEFAULT_PAULI_X_UID, sizeof(DEFAULT_PAULI_X_UID), CardType::PauliX);
+    // set(DEFAULT_PAULI_Y_UID, sizeof(DEFAULT_PAULI_Y_UID), CardType::PauliY);
+    // set(DEFAULT_PAULI_Z_UID, sizeof(DEFAULT_PAULI_Z_UID), CardType::PauliZ);
+    // set(DEFAULT_PAULI_X3_UID, sizeof(DEFAULT_PAULI_X3_UID), CardType::PauliX3);
+    // set(DEFAULT_PAULI_Y3_UID, sizeof(DEFAULT_PAULI_Y3_UID), CardType::PauliY3);
+    // set(DEFAULT_PAULI_Z3_UID, sizeof(DEFAULT_PAULI_Z3_UID), CardType::PauliZ3);
 }
 
 bool CardRegistry::lookup(const uint8_t *uid, uint8_t uidLength, CardType &type) const {

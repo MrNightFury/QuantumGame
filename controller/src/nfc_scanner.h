@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <functional>
 #include <vector>
-
 #include <Arduino.h>
 #include <Adafruit_PN532.h>
 
@@ -22,6 +21,7 @@ class NfcScanner {
         struct TagEvent {
             uint8_t uid[8];
             uint8_t uidLength;
+            String* textData = nullptr;
         };
 
         // Runs in main-loop context (from loop()) for each TagEvent.
@@ -43,7 +43,14 @@ class NfcScanner {
         // Drain the event queue into the handlers; call from the main loop.
         void loop();
 
+        void requestWrite(const String& text);
+        void cancelWrite();
+
     private:
+        SemaphoreHandle_t mux;
+        String textToWrite;
+        bool writeRequested = false;
+
         static void taskEntry(void *arg);
         void scanTask();
 

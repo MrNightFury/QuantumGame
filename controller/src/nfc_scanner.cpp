@@ -1,7 +1,7 @@
 #include "nfc_scanner.h"
+#include "ndef_helper.h"
 
 #include <string.h>
-
 #include "freertos/queue.h"
 
 namespace {
@@ -22,6 +22,7 @@ NfcScanner::NfcScanner(uint8_t irqPin, uint8_t resetPin)
       cardPresent(false), currentUid{0}, currentUidLength(0), absentSince(0) {}
 
 bool NfcScanner::begin() {
+    this->mux = xSemaphoreCreateMutex();
     nfc.begin();
 
     if (!nfc.getFirmwareVersion()) {
@@ -54,7 +55,22 @@ void NfcScanner::loop() {
         for (TagHandler &handler : handlers) {
             handler(event);
         }
+        delete event.textData;
     }
+}
+
+void NfcScanner::requestWrite(const String& text) {
+    xSemaphoreTake(this->mux, portMAX_DELAY);
+    this->textToWrite = text;
+    this->writeRequested = true;
+    xSemaphoreGive(this->mux);
+}
+
+void NfcScanner::cancelWrite() {
+    xSemaphoreTake(this->mux, portMAX_DELAY);
+    this->textToWrite = String();
+    this->writeRequested = false;
+    xSemaphoreGive(this->mux);
 }
 
 void NfcScanner::taskEntry(void *arg) {
@@ -71,22 +87,44 @@ void NfcScanner::scanTask() {
             absentSince = 0;
             bool sameCard = cardPresent && uidLength == currentUidLength && memcmp(uid, currentUid, uidLength) == 0;
             if (!sameCard) {
-                // New application: another tag, or the same tag after a
-                // confirmed removal. Publish and remember it.
                 cardPresent = true;
                 memcpy(currentUid, uid, uidLength);
                 currentUidLength = uidLength;
 
-                TagEvent event;
+                String writeBuf;
+                bool writeFlag = false;
+                xSemaphoreTake(this->mux, portMAX_DELAY); // Ugh, multithreading, disgusting
+                if (this->writeRequested) {
+                    std::swap(writeBuf, textToWrite);
+                    writeFlag = true;
+                    this->writeRequested = false;
+                }
+                xSemaphoreGive(this->mux);
+
+                if (writeFlag) {
+                    if (!writeNDEFText(this->nfc, writeBuf)) {
+                        Serial.println("[NFC] Write failed");
+                    }
+                }
+
+                TagEvent event {};
                 memcpy(event.uid, uid, uidLength);
                 event.uidLength = uidLength;
+                String textData;
+                if (readNDEFText(nfc, textData)) {
+                    Serial.printf("[NDEF] \"%s\", len: %u\n", textData.c_str(), textData.length());
+                    event.textData = new String(textData);
+                } else {
+                    Serial.println("[NDEF] Cant read card");
+                }
+                
                 if (xQueueSend(eventQueue, &event, 0) != pdTRUE) {
+                    if (event.textData) delete event.textData;
                     Serial.println("[NFC] Event queue full, dropping tag event");
                 }
             }
         } else if (cardPresent) {
-            // Absence must persist for REMOVAL_CONFIRM_MS before the tag
-            // counts as removed; short glitches do not fire new events.
+            // Some delay to count card as removed
             if (absentSince == 0) {
                 absentSince = millis();
             } else if (millis() - absentSince >= REMOVAL_CONFIRM_MS) {

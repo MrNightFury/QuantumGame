@@ -48,11 +48,18 @@ void GameController::handleWsEvent(const char *event, uint8_t clientId,
 
 void GameController::handleTag(const NfcScanner::TagEvent &event) {
     // Not in game: register card or report scan
-    if (!isGameOn || !gameState) {
-        CardRegistry::CardType type;
-        bool registered = cards.lookup(event.uid, event.uidLength, type);
+    CardRegistry::CardType type, writtenType;
+    bool registered = cards.lookup(event.uid, event.uidLength, type);
+    bool written = event.textData && CardRegistry::fromString(event.textData->c_str(), writtenType);
 
-        if (awaitingCard) {
+    if (!registered && written) {
+        type = writtenType;
+        registered = true;
+        Serial.println("[Game] Card not registered, fallback to written type");
+    }
+
+    if (!isGameOn || !gameState) {
+        if (awaitingCard && written && (writtenType == pendingCardType)) {
             cards.set(event.uid, event.uidLength, pendingCardType);
             cards.save();
             awaitingCard = false;
@@ -68,15 +75,14 @@ void GameController::handleTag(const NfcScanner::TagEvent &event) {
                       registered ? CardRegistry::toString(type) : "unknown");
         JsonDocument scannedDoc;
         scannedDoc["registered"] = registered;
-        if (registered) {
+        if (registered || written) {
             scannedDoc["type"] = CardRegistry::toString(type);
         }
         ws.broadcast("cardScanned", scannedDoc);
         return;
     }
 
-    CardRegistry::CardType type;
-    if (!cards.lookup(event.uid, event.uidLength, type)) {
+    if (!registered) {
         Serial.print("[Game] Unknown card (uid:");
         for (uint8_t i = 0; i < event.uidLength; i++) {
             Serial.printf(" %02X", event.uid[i]);
@@ -287,6 +293,7 @@ void GameController::writeCard(uint8_t clientId, JsonVariantConst data) {
     // An empty type name cancels the pending write. Maybe thats stupid, will think about it later
     if (typeName[0] == '\0') {
         awaitingCard = false;
+        this->scanner.cancelWrite();
         Serial.println("[Game] Pending card write cancelled");
         return;
     }
@@ -300,6 +307,7 @@ void GameController::writeCard(uint8_t clientId, JsonVariantConst data) {
     pendingCardType = type;
     pendingWriteClient = clientId;
     awaitingCard = true;
+    this->scanner.requestWrite(typeName);
     Serial.printf("[Game] Waiting for a card to register as %s\n", typeName);
 }
 
