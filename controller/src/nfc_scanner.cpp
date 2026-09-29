@@ -7,9 +7,8 @@
 namespace {
 const uint8_t QUEUE_LENGTH = 8;
 
-// How long the reader must fail to see the tag for its removal to be
-// confirmed (~250 ms). Until then a re-applied tag counts as still lying
-// on the reader; after that it is a new application.
+// How long the reader must fail to see the tag for its removal to be confirmed (~250 ms).
+// Until then a re-applied tag counts as still lying on the reader; after that it is a new one.
 const uint32_t REMOVAL_CONFIRM_MS = 250;
 
 // Per-poll reader timeout and pause between polls.

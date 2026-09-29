@@ -182,11 +182,13 @@ bool WSController::nameTaken(const String &name, uint8_t clientId) const {
     return false;
 }
 
-// Name rules: empty names are ignored; the name is truncated to
-// NAME_MAX_LENGTH chars; names shaped like the automatic "player<id>"
-// fallback are not allowed; a taken name gets a number suffix ("Name2",
-// "Name3", ...). A rename is announced to everyone (including the renamed
-// client) with "removeOnlineUser" followed by "addOnlineUser".
+// Name rules:
+// - empty names are ignored;
+// - the name is truncated to NAME_MAX_LENGTH chars;
+// - names shaped like the automatic "player<id>" fallback are not allowed;
+// - a taken name gets a number suffix ("Name2", "Name3", ...).
+// A rename is announced to everyone (including the renamed client) with "removeOnlineUser" followed by "addOnlineUser"
+// (i know thats weird but im not in state of mind to add separate chenge player name ws event)
 void WSController::setUserName(uint8_t clientId, const String &name) {
     if (name.length() == 0) {
         return;
@@ -194,8 +196,7 @@ void WSController::setUserName(uint8_t clientId, const String &name) {
 
     String base = name.substring(0, NAME_MAX_LENGTH);
 
-    // "player<number>" is the automatic fallback namespace - a client
-    // cannot claim it.
+    // "player<number>" is the automatic fallback namespace - a client cannot claim it
     if (base.startsWith("player")) {
         String suffix = base.substring(6);
         bool isNumber = suffix.length() > 0;
@@ -209,8 +210,7 @@ void WSController::setUserName(uint8_t clientId, const String &name) {
         }
     }
 
-    // Make room for the suffix inside the length limit, then find the first
-    // free variant.
+    // Make room for the suffix inside the length limit, then find the first free variant
     String newName = base;
     for (unsigned int attempt = 2; nameTaken(newName, clientId); attempt++) {
         String suffix = String(attempt);
@@ -224,7 +224,7 @@ void WSController::setUserName(uint8_t clientId, const String &name) {
     userNames[clientId] = newName;
     Serial.printf("[WS] client %u renamed to %s\n", (unsigned)clientId, newName.c_str());
 
-    // Announce the rename: the old entry leaves, the new one arrives.
+    // Announce the rename: the old entry leaves, the new one arrives
     JsonDocument removed;
     removed = clientId;
     broadcast("removeOnlineUser", removed);
@@ -233,4 +233,8 @@ void WSController::setUserName(uint8_t clientId, const String &name) {
     added["id"] = clientId;
     added["name"] = newName;
     broadcast("addOnlineUser", added);
+}
+
+size_t WSController::getConnectionCount() const {
+    return onlineUsers.size();
 }

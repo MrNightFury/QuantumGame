@@ -8,16 +8,14 @@
 namespace Game {
 
 namespace {
-
-// NVS location of the persisted registry.
+// NVS location of the persisted registry
 const char STORAGE_NAMESPACE[] = "cards";
 const char STORAGE_KEY[] = "registry";
 
-// RFID UIDs are at most 8 bytes.
+// RFID UIDs are at most 8 bytes
 const uint8_t MAX_UID_LENGTH = 8;
 
-// Hardcoded default mappings. Placeholder UIDs: replace at runtime via
-// set() + save(), or edit them here.
+// Hardcoded default mappings for testing. TODO - remove?
 const uint8_t DEFAULT_PAULI_X_UID[] = {0x04, 0x0D, 0x67, 0x02, 0x7B, 0x13, 0x91};
 const uint8_t DEFAULT_PAULI_Y_UID[] = {0x04, 0x0D, 0x66, 0x02, 0x7B, 0x13, 0x91};
 const uint8_t DEFAULT_PAULI_Z_UID[] = {0x04, 0x11, 0x22, 0x33, 0x44, 0x55, 0x88};
@@ -26,15 +24,11 @@ const uint8_t DEFAULT_PAULI_Y3_UID[] = {0x04, 0x11, 0x22, 0x33, 0x44, 0x55, 0xAA
 const uint8_t DEFAULT_PAULI_Z3_UID[] = {0x04, 0x11, 0x22, 0x33, 0x44, 0x55, 0xBB};
 
 const char *const TYPE_NAMES[] = {
-    "pauli_x", "pauli_y", "pauli_z", "pauli_x3", "pauli_y3", "pauli_z3",
-
-    "phase_forward",
-    "phase_backward",
-    "rotate_x",
-    "rotate_y",
-    "rotate_z",
-    "hadamard",
-    "hadamard_3",
+    "pauli_x", "pauli_y", "pauli_z",
+    "pauli_x3", "pauli_y3", "pauli_z3",
+    "phase_forward", "phase_backward",
+    "rotate_x", "rotate_y", "rotate_z",
+    "hadamard", "hadamard_3",
     "swap",
     "quantum_noise",
     "kronecker_multiplication",
@@ -50,7 +44,7 @@ bool sameUid(const std::vector<uint8_t> &uid, const uint8_t *other, uint8_t othe
     return uid.size() == otherLength && memcmp(uid.data(), other, otherLength) == 0;
 }
 
-// Table format: uint16 count, then per entry: uidLength, uid bytes, type.
+// Table format: uint16 count, then per entry: uidLength, uid bytes, type
 std::vector<uint8_t> serializeTable(const std::vector<CardRegistry::Entry> &table) {
     std::vector<uint8_t> buffer;
     buffer.push_back(table.size() & 0xFF);
@@ -98,13 +92,14 @@ bool deserializeTable(const uint8_t *data, size_t length, std::vector<CardRegist
 
 } // namespace
 
+// Default cards set. Overwritten by saved cards. TODO - remove?
 CardRegistry::CardRegistry() {
-    // set(DEFAULT_PAULI_X_UID, sizeof(DEFAULT_PAULI_X_UID), CardType::PauliX);
-    // set(DEFAULT_PAULI_Y_UID, sizeof(DEFAULT_PAULI_Y_UID), CardType::PauliY);
-    // set(DEFAULT_PAULI_Z_UID, sizeof(DEFAULT_PAULI_Z_UID), CardType::PauliZ);
-    // set(DEFAULT_PAULI_X3_UID, sizeof(DEFAULT_PAULI_X3_UID), CardType::PauliX3);
-    // set(DEFAULT_PAULI_Y3_UID, sizeof(DEFAULT_PAULI_Y3_UID), CardType::PauliY3);
-    // set(DEFAULT_PAULI_Z3_UID, sizeof(DEFAULT_PAULI_Z3_UID), CardType::PauliZ3);
+    set(DEFAULT_PAULI_X_UID, sizeof(DEFAULT_PAULI_X_UID), CardType::PauliX);
+    set(DEFAULT_PAULI_Y_UID, sizeof(DEFAULT_PAULI_Y_UID), CardType::PauliY);
+    set(DEFAULT_PAULI_Z_UID, sizeof(DEFAULT_PAULI_Z_UID), CardType::PauliZ);
+    set(DEFAULT_PAULI_X3_UID, sizeof(DEFAULT_PAULI_X3_UID), CardType::PauliX3);
+    set(DEFAULT_PAULI_Y3_UID, sizeof(DEFAULT_PAULI_Y3_UID), CardType::PauliY3);
+    set(DEFAULT_PAULI_Z3_UID, sizeof(DEFAULT_PAULI_Z3_UID), CardType::PauliZ3);
 }
 
 bool CardRegistry::lookup(const uint8_t *uid, uint8_t uidLength, CardType &type) const {

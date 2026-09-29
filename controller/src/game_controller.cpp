@@ -11,47 +11,30 @@ GameController::GameController(NfcScanner &scanner, WSController &ws)
     // Stored registry (if any) overrides the hardcoded defaults.
     cards.load();
     scanner.onTag([this](const NfcScanner::TagEvent &event) { handleTag(event); });
+
     ws.on("startGame", [this](uint8_t clientId, JsonVariantConst data) {
-        handleWsEvent("startGame", clientId, data);
+        startGame(data);
     });
     ws.on("selectTarget", [this](uint8_t clientId, JsonVariantConst data) {
-        handleWsEvent("selectTarget", clientId, data);
+        selectTarget(clientId, data);
     });
     ws.on("writeCard", [this](uint8_t clientId, JsonVariantConst data) {
-        handleWsEvent("writeCard", clientId, data);
+        writeCard(clientId, data);
     });
     ws.on("giveUp", [this](uint8_t clientId, JsonVariantConst data) {
-        handleWsEvent("giveUp", clientId, data);
+        giveUp(clientId);
     });
     ws.on("cardInput", [this](uint8_t clientId, JsonVariantConst data) {
-        handleWsEvent("cardInput", clientId, data);
-    });
-}
-
-void GameController::handleWsEvent(const char *event, uint8_t clientId,
-                                   JsonVariantConst data) {
-    // Switch by event name.
-    if (strcmp(event, "startGame") == 0) {
-        startGame(data);
-    } else if (strcmp(event, "selectTarget") == 0) {
-        selectTarget(clientId, data);
-    } else if (strcmp(event, "writeCard") == 0) {
-        writeCard(clientId, data);
-    } else if (strcmp(event, "giveUp") == 0) {
-        giveUp(clientId);
-    } else if (strcmp(event, "cardInput") == 0) {
         cardInput(clientId, data);
-    } else {
-        Serial.printf("[Game] Unknown ws event: %s\n", event);
-    }
+    });
 }
 
 void GameController::handleTag(const NfcScanner::TagEvent &event) {
-    // Not in game: register card or report scan
     CardRegistry::CardType type, writtenType;
     bool registered = cards.lookup(event.uid, event.uidLength, type);
     bool written = event.textData && CardRegistry::fromString(event.textData->c_str(), writtenType);
 
+    // Fallback to written card type if not registered locally
     if (!registered && written) {
         type = writtenType;
         registered = true;
@@ -59,18 +42,19 @@ void GameController::handleTag(const NfcScanner::TagEvent &event) {
     }
 
     if (!isGameOn || !gameState) {
+        // Writing - check if written correctly and report to user
         if (awaitingCard && written && (writtenType == pendingCardType)) {
             cards.set(event.uid, event.uidLength, pendingCardType);
             cards.save();
             awaitingCard = false;
             Serial.printf("[Game] Card registered as %s\n",
                           CardRegistry::toString(pendingCardType));
-            // No data: only the writer needs to know the write is done.
             JsonDocument writtenDoc;
             ws.send(pendingWriteClient, "cardWritten", writtenDoc);
             return;
         }
 
+        // Not writing - broadcast scanned card to everyone
         Serial.printf("[Game] Card scanned: %s\n",
                       registered ? CardRegistry::toString(type) : "unknown");
         JsonDocument scannedDoc;
@@ -82,6 +66,7 @@ void GameController::handleTag(const NfcScanner::TagEvent &event) {
         return;
     }
 
+    // Unregistered and unwritten card
     if (!registered) {
         Serial.print("[Game] Unknown card (uid:");
         for (uint8_t i = 0; i < event.uidLength; i++) {
@@ -104,8 +89,7 @@ void GameController::handleTag(const NfcScanner::TagEvent &event) {
 
     CardRequirement requirement = cardRequirement(type);
 
-    // The kronecker card takes no card slot: it only arms the pair mode,
-    // the next two cards will share a single slot.
+    // The kronecker card takes no card slot: it only arms the pair mode, the next two cards will share a single slot
     if (type == CardRegistry::CardType::KroneckerMultiplication) {
         if (kroneckerActive) {
             refusePlay("kroneckerAlreadyActive");
@@ -141,7 +125,7 @@ void GameController::handleTag(const NfcScanner::TagEvent &event) {
     }
 
     // The second card of a kronecker pair must hit a register the first
-    // card bound the pair to (no restriction while the list is empty).
+    // card bound the pair to (no restriction while the list is empty)
     if (kroneckerActive && kroneckerPairCards == 1 && !kroneckerRegisters.empty()) {
         bool registerAllowed = false;
         for (size_t reg : kroneckerRegisters) {
@@ -319,19 +303,17 @@ bool GameController::commitCard(CardRegistry::CardType type,
         return false;
     }
     gameState->playedCardUids.emplace_back(uid, uid + uidLength);
-    // Record the card in the history of every cubit it affected (the whole
-    // window for the x3 cards, both dice for swap).
+    // Record the card in the history of every cubit it affected (the whole window for the x3 cards, both dice for swap)
     recordPlayedCards(type, *gameState, params);
     hasTarget = false;  // the chosen cubit is consumed by the card
 
     // Card slot accounting. A kronecker card itself is free; the two cards
-    // after it share a single slot, so the counter grows only once, when
-    // the pair completes.
+    // after it share a single slot, so the counter grows only once, when the pair completes
     if (type != CardRegistry::CardType::KroneckerMultiplication) {
         if (kroneckerActive && kroneckerPairCards == 0) {
             // First card of the pair: it binds the pair to every register
             // it involved (a targetless card binds none, the pair stays
-            // unrestricted). No slot is spent yet.
+            // unrestricted). No slot is spent yet
             kroneckerPairCards = 1;
             kroneckerRegisters.clear();
             if (needsTarget(type)) {
@@ -341,7 +323,7 @@ bool GameController::commitCard(CardRegistry::CardType type,
                 }
             }
         } else if (kroneckerActive) {
-            // Second card of the pair: complete, one slot for two cards.
+            // Second card of the pair: complete, one slot for two cards
             kroneckerActive = false;
             kroneckerPairCards = 0;
             kroneckerRegisters.clear();
@@ -354,14 +336,12 @@ bool GameController::commitCard(CardRegistry::CardType type,
     // Two cards per turn
     // Pass the turn before notifying the players
     if (gameState->playedCards >= GameState::CARDS_PER_TURN) {
-        gameState->currentPlayer =
-            (gameState->currentPlayer + 1) % gameState->playerIds.size();
+        gameState->currentPlayer = (gameState->currentPlayer + 1) % gameState->playerIds.size();
         // A barrier flag makes the player skip their turn: keep advancing
-        // while the current player is flagged, consuming one flag each.
+        // while the current player is flagged, consuming one flag each
         while (gameState->skipNextTurn[gameState->currentPlayer]) {
             gameState->skipNextTurn[gameState->currentPlayer] = false;
-            gameState->currentPlayer =
-                (gameState->currentPlayer + 1) % gameState->playerIds.size();
+            gameState->currentPlayer = (gameState->currentPlayer + 1) % gameState->playerIds.size();
         }
         gameState->playedCards = 0;
     }
@@ -371,8 +351,7 @@ bool GameController::commitCard(CardRegistry::CardType type,
         playedDoc["target"]["register"] = params.primary.player;
         playedDoc["target"]["cubit"] = params.primary.cubit;
     } else {
-        // Cards without an aim (identity, reshuffle, barrier, kronecker)
-        // are not aimed at a cubit.
+        // Cards without an aim (identity, reshuffle, barrier, kronecker) are not aimed at a cubit
         playedDoc["target"] = nullptr;
     }
     playedDoc["card"] = CardRegistry::toString(type);
@@ -437,7 +416,7 @@ void GameController::cardInput(uint8_t clientId, JsonVariantConst data) {
         params.hasSecond = true;
         params.second = {playerIndex, cubitIndex};
 
-        // The second die of a swap must not be measured either.
+        // The second die of a swap must not be measured either
         if (cubitMeasured(state, params.second.player, params.second.cubit)) {
             Serial.println("[Game] cardInput second target is measured");
             refusePlay("measured");
@@ -445,7 +424,7 @@ void GameController::cardInput(uint8_t clientId, JsonVariantConst data) {
         }
 
         // A swap that closes a kronecker pair must keep its second target
-        // inside the registers the first card bound the pair to.
+        // inside the registers the first card bound the pair to
         if (kroneckerActive && kroneckerPairCards == 1 && !kroneckerRegisters.empty()) {
             bool registerAllowed = false;
             for (size_t reg : kroneckerRegisters) {
@@ -539,8 +518,8 @@ void GameController::endGame(size_t winnerIndex) {
     kroneckerPairCards = 0;
     kroneckerRegisters.clear();
 
-    // Same naming as the online users list.
-    // The winner's display name (custom if set, else "player<id>").
+    // Same naming as the online users list
+    // The winner's display name (custom if set, else "player<id>")
     String winnerName = ws.nameOf(winnerId);
 
     JsonDocument endedDoc;
@@ -586,8 +565,8 @@ JsonDocument GameController::buildGameStateDoc() const {
     }
 
     // cardsOnField is a matrix aligned with registers: per player, per cubit,
-    // the name of the last card played there, or null when none. The
-    // controller keeps the full history in GameState::cardHistory.
+    // the name of the last card played there, or null when none
+    // The controller keeps the full history in GameState::cardHistory
     JsonArray fieldCards = doc["cardsOnField"].to<JsonArray>();
     for (size_t player = 0; player < state.cardHistory.size(); player++) {
         JsonArray cubitCards = fieldCards.add<JsonArray>();
@@ -605,15 +584,14 @@ JsonDocument GameController::buildGameStateDoc() const {
     doc["currentPlayer"] = state.currentPlayer;
     doc["playedCards"] = state.playedCards;
 
-    // Per-player barrier flags: the flagged players skip their next turn.
+    // Per-player barrier flags: the flagged players skip their next turn
     JsonArray skips = doc["skipNextTurn"].to<JsonArray>();
     for (bool skip : state.skipNextTurn) {
         skips.add(skip);
     }
 
-    // Kronecker pair in progress: the registers the pair is bound to and
-    // how many of its two cards are applied. An empty register list means
-    // the first card is not played yet (or bound nothing) - any register
+    // Kronecker pair in progress: the registers the pair is bound to and how many of its two cards are applied
+    // An empty register list means the first card is not played yet (or bound nothing) - any register
     // goes for the remaining cards. null when no pair is armed.
     if (kroneckerActive) {
         JsonObject kronecker = doc["kronecker"].to<JsonObject>();

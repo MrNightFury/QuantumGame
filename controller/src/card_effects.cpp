@@ -4,8 +4,7 @@ namespace Game {
 
 namespace {
 
-// Window of cubits hit by an x3 card: the target in the middle, clamped at
-// the register edges.
+// Window of cubits hit by an x3 card: the target in the middle, clamped at the register edges
 void x3Window(size_t targetCubit, size_t diceCount, size_t *start, size_t *end) {
     *start = (targetCubit > 0) ? targetCubit - 1 : 0;
     *end = (*start + 3 < diceCount) ? *start + 3 : diceCount;
@@ -53,7 +52,6 @@ CardRequirement cardRequirement(CardRegistry::CardType type) {
         case CardRegistry::CardType::PauliX3:
         case CardRegistry::CardType::PauliY3:
         case CardRegistry::CardType::PauliZ3:
-
         case CardRegistry::CardType::Hadamard:
         case CardRegistry::CardType::Hadamard3:
         case CardRegistry::CardType::PhaseForward:
@@ -61,11 +59,13 @@ CardRequirement cardRequirement(CardRegistry::CardType type) {
         case CardRegistry::CardType::QuantumNoise:
         case CardRegistry::CardType::Measurement:
             return CardRequirement::OneTarget;
+
         case CardRegistry::CardType::RotateX:
         case CardRegistry::CardType::RotateY:
         case CardRegistry::CardType::RotateZ:
         case CardRegistry::CardType::QuantumLucky:
             return CardRequirement::TargetAndFace;
+
         case CardRegistry::CardType::Swap:
             return CardRequirement::TwoTargets;
     }
@@ -126,7 +126,8 @@ bool applyCard(CardRegistry::CardType type, GameState &state, const CardParams &
         case CardRegistry::CardType::RotateX:
         case CardRegistry::CardType::RotateY:
         case CardRegistry::CardType::RotateZ: {
-            // Turn the chosen die until it shows the requested face.
+            // Turn the chosen die until it shows the requested face
+            // It was 2 AM, i dont know why i made it this way. TODO - refactor
             Die::Axis axis = Die::Axis::Z;
             if (type == CardRegistry::CardType::RotateX) {
                 axis = Die::Axis::X;
@@ -140,15 +141,14 @@ bool applyCard(CardRegistry::CardType type, GameState &state, const CardParams &
             break;
         }
         case CardRegistry::CardType::QuantumNoise:
-            // Undo the last card on the chosen cubit; false = no effect.
+            // Undo the last card on the chosen cubit; false = no effect
             return undoLastCard(state, params.primary);
         case CardRegistry::CardType::QuantumLucky:
-            // Set the chosen die to any of the six faces.
+            // Set the chosen die to any of the six faces
             reg.dice[params.primary.cubit].face = params.face;
             break;
         case CardRegistry::CardType::Swap: {
-            // Exchange the states of the two chosen dice. The second die may
-            // live in another player's register, so go through state.
+            // Exchange the states of the two chosen dice
             Die &first = state.registers[params.primary.player].dice[params.primary.cubit];
             Die &second = state.registers[params.second.player].dice[params.second.cubit];
             Die::Face temp = first.face;
@@ -157,17 +157,15 @@ bool applyCard(CardRegistry::CardType type, GameState &state, const CardParams &
             break;
         }
         case CardRegistry::CardType::Barrier:
-            // The next player in turn order skips their next turn. The flag
-            // is consumed when the turn passes over them.
+            // The next player in turn order skips their next turn. The flag is consumed when the turn passes over them
             state.skipNextTurn[(state.currentPlayer + 1) % state.playerIds.size()] = true;
             break;
         case CardRegistry::CardType::KroneckerMultiplication:
-            // Turn-flow card: the pair mode it arms is handled by the
-            // controller (commitCard), the game state itself is unchanged.
+            // Turn-flow card: the pair mode it arms is handled by the controller (commitCard), the game state itself is unchanged
+            // Which is bad but ugh. TODO - refactor 
             break;
         case CardRegistry::CardType::Measurement:
-            // The measurement does not change the die: it locks the cubit
-            // (see cantPlayReason) until quantum noise cancels it.
+            // It is played, it is enough. The controller checks if measure is last card on cubit
             break;
         default:
             break;
@@ -184,8 +182,6 @@ bool isUndoable(CardRegistry::CardType type) {
         case CardRegistry::CardType::PhaseBackward:
         case CardRegistry::CardType::Hadamard:
         case CardRegistry::CardType::Measurement:
-            // Quantum noise cancels a measurement too: the marker has no
-            // dice effect, so its inverse is a no-op.
             return true;
         default:
             return false;
@@ -209,16 +205,13 @@ bool undoLastCard(GameState &state, const Target &target) {
 bool cubitMeasured(const GameState &state, size_t player, size_t cubit) {
     const std::vector<CardRegistry::CardType> &history =
         state.cardHistory[player][cubit];
-    return !history.empty() &&
-           history.back() == CardRegistry::CardType::Measurement;
+    return !history.empty() && history.back() == CardRegistry::CardType::Measurement;
 }
 
+// Returns nullptr if the card can be played on the target, else a string describing why it cannot
 const char *cantPlayReason(CardRegistry::CardType type, const GameState &state,
                            const Target &target, size_t cardsPlayedInPair) {
-    // A measured cubit is locked: every aimed card is refused, including
-    // x3 cards whose window merely touches it. Quantum noise is the only
-    // exception - it cancels the measurement. (Swap's second die is
-    // checked by the controller when the input arrives.)
+    // Cubit measured, if we even touch measured cubit (except for quantum noise)
     if (type != CardRegistry::CardType::QuantumNoise && needsTarget(type)) {
         if (cubitMeasured(state, target.player, target.cubit)) {
             return "measured";
@@ -237,8 +230,7 @@ const char *cantPlayReason(CardRegistry::CardType type, const GameState &state,
         case CardRegistry::CardType::PauliY3:
         case CardRegistry::CardType::PauliZ3:
         case CardRegistry::CardType::Hadamard3: {
-            // The window keeps the target in the middle, so the first and
-            // the last cubit of a register cannot host an x3 card.
+            // x3 cards are not playable on first or last cubits
             const std::vector<Die> &dice =
                 state.registers[target.player].dice;
             if (dice.size() < 3 || target.cubit == 0 ||
@@ -259,8 +251,7 @@ const char *cantPlayReason(CardRegistry::CardType type, const GameState &state,
             return nullptr;
         }
         case CardRegistry::CardType::Barrier: {
-            // The barrier flags the next player; flagging the same player
-            // twice is pointless, so the second barrier is refused.
+            // Can't set barrier if theres already one
             size_t next = (state.currentPlayer + 1) % state.playerIds.size();
             if (state.skipNextTurn[next]) {
                 return "barrierAlreadySet";
@@ -268,21 +259,15 @@ const char *cantPlayReason(CardRegistry::CardType type, const GameState &state,
             return nullptr;
         }
         case CardRegistry::CardType::Identity:
-            // Identity only burns a card slot of the turn; it cannot open
-            // the turn. Inside a kronecker pair the turn counter does not
-            // grow yet, so the pair progress counts as "already played".
-            return (state.playedCards == 0 && cardsPlayedInPair == 0)
-                       ? "identityFirst"
-                       : nullptr;
+            // Identity can only be played second
+            return (state.playedCards == 0 && cardsPlayedInPair == 0) ? "identityFirst" : nullptr;
         default:
             return nullptr;
     }
 }
 
-// Cubit indices (relative to the target player's register) that the card
-// affects when applied to `target`: 1 for single-cubit cards, up to 3 for
-// the x3 cards (target in the middle, clamped at the register edges).
-// Writes at most `maxCubits` indices into `outCubits` and returns the count.
+// Cubit indices that the card affects when applied to `target`
+// Returns cubit count and writes the indices into `outCubits`
 size_t affectedCubits(CardRegistry::CardType type, const GameState &state,
                       const Target &target, size_t *outCubits, size_t maxCubits) {
     size_t count = 0;
@@ -334,7 +319,6 @@ size_t allowedFaces(CardRegistry::CardType type, const GameState &state,
     }
 
     // Rotate cards may turn the die to any face reachable around their axis
-    // (Die::reachable includes the current face - a full turn, no effect).
     Die::Axis axis;
     switch (type) {
         case CardRegistry::CardType::RotateX:
@@ -363,7 +347,7 @@ size_t allowedFaces(CardRegistry::CardType type, const GameState &state,
 }
 
 // Records the played card in the per-cubit histories: the whole window for
-// x3 cards, both dice for swap, the single cubit for the rest.
+// x3 cards, both dice for swap, the single cubit for the rest
 void recordPlayedCards(CardRegistry::CardType type, GameState &state,
                        const CardParams &params) {
     if (type == CardRegistry::CardType::Swap) {
@@ -380,4 +364,3 @@ void recordPlayedCards(CardRegistry::CardType type, GameState &state,
 }
 
 }  // namespace Game
-

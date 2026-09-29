@@ -19,24 +19,19 @@ class Die {
         enum class Face : uint8_t { Plus, Minus, PlusI, MinusI, Zero, One };
         enum class Axis : uint8_t { X, Y, Z };
 
-        // Current face of the die.
         Face face;
 
         explicit Die(Face face = Face::One);
 
-        // Face label: "+", "-", "i", "-i", "0" or "1".
+        // Face label: "+", "-", "i", "-i", "0" or "1"
         static const char *toString(Face face);
         const char *faceString() const;
 
-        // Rotate the die around the axis by 90, -90 or 180 degrees
-        // (any other angle is ignored with a log line).
-        // Z, +90:  "+" -> "-i" -> "-" -> "i" -> "+", "0"/"1" unchanged;
-        // the other axes cycle analogously, faces on the axis stay.
+        // Rotate the die around the axis by 90, -90 or 180 degrees (any other angle is ignored with a log line)
         void rotate(Axis axis, int degrees);
 
-        // All faces reachable from the given one by rotating around the
-        // axis: the four side faces for an off-axis face, the face itself
-        // for a face lying on the axis.
+        // All faces reachable from the given one by rotating around the axis:
+        // the four side faces for an off-axis face, the face itself for a face lying on the axis.
         static std::vector<Face> reachable(Face face, Axis axis);
 };
 

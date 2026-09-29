@@ -6,7 +6,7 @@
 #include <Arduino.h>
 #include <Adafruit_PN532.h>
 
-// PN532-based NFC tag scanner running in its own FreeRTOS task.
+// PN532-based NFC tag scanner running in its own task.
 //
 // The task polls the reader and runs a debounced presence state machine:
 // a tag lying on the reader produces a single event, removal is confirmed
@@ -24,23 +24,21 @@ class NfcScanner {
             String* textData = nullptr;
         };
 
-        // Runs in main-loop context (from loop()) for each TagEvent.
+        // Runs in main-loop context (from loop()) for each TagEvent
         using TagHandler = std::function<void(const TagEvent &)>;
 
         NfcScanner(uint8_t irqPin, uint8_t resetPin);
 
-        // Bring the reader up; false when no PN532 firmware answers.
+        // Bring the reader up; false when no PN532 firmware answers
         bool begin();
 
-        // Spawn the polling task on core 0. Idempotent: does nothing
-        // when the task is already running.
+        // Spawn the polling task on core 0. Idempotent: does nothing when the task is already running
         void start();
 
-        // Subscribe to tag events. Subscribe before start() or from
-        // loop(); the list is not touched by the task.
+        // Subscribe to tag events. Subscribe before start() or from loop(); the list is not touched by the task
         void onTag(TagHandler handler);
 
-        // Drain the event queue into the handlers; call from the main loop.
+        // Drain the event queue into the handlers; call from the main loop
         void loop();
 
         void requestWrite(const String& text);
@@ -60,7 +58,7 @@ class NfcScanner {
 
         std::vector<TagHandler> handlers;
 
-        // Presence state machine, owned by the task.
+        // Presence state machine, owned by the task
         bool cardPresent;
         uint8_t currentUid[8];
         uint8_t currentUidLength;

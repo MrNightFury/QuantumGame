@@ -2,45 +2,43 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <WebSocketsServer.h>
 #include <functional>
 #include <vector>
 #include <map>
+#include <WebSocketsServer.h>
+
 
 // WebSocket controller with a JSON text protocol.
 //
 // Every message is a JSON object: {"event":"<name>","data":<any JSON value>}.
 // "event" (string) selects the handler, "data" carries the event payload.
-// Incoming messages are parsed with ArduinoJson on receipt; the subscriber
-// gets "data" as JsonVariantConst - a view into the parsed document, valid
-// only for the duration of the handler call.
+// Incoming messages are parsed with ArduinoJson on receipt;
+// the subscriber gets "data" as JsonVariantConst - a view into the parsed document, valid only for the duration of the handler call.
 //
 // Connection lifecycle broadcasts:
 //   connect:    the new client receives {"event":"setId","data":<id>},
-//               then {"event":"setOnlineUsers",
-//                 "data":[{"id":0,"name":"player0"},...]};
+//               then {"event":"setOnlineUsers", "data":[{"id":0,"name":"player0"},...]};
 //               the others receive {"event":"addOnlineUser","data":{id,name}}
 //   disconnect: everyone receives {"event":"removeOnlineUser","data":<id>}
 class WSController {
     public:
-        // clientId - websocket connection id, data - parsed "data" field
-        // (null variant if the message has no "data").
+        // `clientId` - websocket connection id
+        // `data` - parsed "data" field (null variant if the message has no "data")
         using EventHandler = std::function<void(uint8_t clientId, JsonVariantConst data)>;
 
         explicit WSController(uint16_t port = 81);
 
         void loop();
-        // Subscribe to messages whose "event" field equals event.
+        // Subscribe to messages whose "event" field equals event
         void on(const char *event, EventHandler handler);
 
-        // Compose {"event":<event>,"data":<data>} and send it to one client
-        // or to everyone. data is a view into the caller's JSON value and is
-        // serialized before returning, so a local JsonDocument works fine.
+        // Compose {"event":<event>,"data":<data>} and send it to one client or to everyone
+        // data is a view into the caller's JSON value and is serialized before returning, so a local JsonDocument works fine
         void send(uint8_t clientId, const char *event, JsonVariantConst data);
         void broadcast(const char *event, JsonVariantConst data);
+        size_t getConnectionCount() const;
 
-        // Display name of the client: the custom one if set, else
-        // "player<id>".
+        // Display name of the client: the custom one if set, else "player<id>"
         String nameOf(uint8_t clientId) const;
 
     private:
@@ -61,6 +59,7 @@ class WSController {
 
         bool nameTaken(const String &name, uint8_t clientId) const;
         void setUserName(uint8_t clientId, const String &name);
+        
 
         WebSocketsServer server;
         std::vector<uint8_t> onlineUsers;

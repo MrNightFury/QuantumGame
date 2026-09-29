@@ -33,16 +33,24 @@ void setup() {
     web = new BoardGameWeb(webConfig);
     wsController = new WSController();
 
-    // Subscribes to tags itself; start scanning only after that.
+    // Subscribes to tags by itself, starts scanning only after that
     gameController = new Game::GameController(*scanner, *wsController);
     scanner->start();
 
     delay(1000);
 }
 
+
 void loop() {
     web->loop();
     wsController->loop();
     scanner->loop();
     delay(1);
+
+    static uint32_t lastStats = 0;
+    if (millis() - lastStats >= 10000) {
+        lastStats = millis();
+        Serial.printf("[Metrics] Free heap: %u (min: %u), WS connections: %u\n",
+            ESP.getFreeHeap(), ESP.getMinFreeHeap(), wsController->getConnectionCount());
+    }
 }

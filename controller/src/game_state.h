@@ -10,8 +10,7 @@
 namespace Game {
 
 // Full state of a game in progress: players with their registers, the target
-// register, whose turn it is and how many cards the current player has
-// played this turn.
+// register, whose turn it is and how many cards the current player has played this turn.
 struct GameState {
     std::vector<uint8_t> playerIds;
     std::vector<Register> registers;
@@ -34,7 +33,7 @@ struct GameState {
     // the turn passes over the flagged player.
     std::vector<bool> skipNextTurn;
 
-    // Whether the tag uid has already been played in this game.
+    // Whether the tag uid has already been played in this game
     bool isCardPlayed(const uint8_t *uid, uint8_t uidLength) const;
 
     static const size_t CARDS_PER_TURN = 2;

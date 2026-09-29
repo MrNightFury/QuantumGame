@@ -5,8 +5,9 @@ namespace {
 // (rows: X, Y, Z). Faces lying on the rotation axis map to themselves.
 //   X: "i" -> "0" -> "-i" -> "1" -> "i"
 //   Y: "+" -> "1" -> "-" -> "0" -> "+"
-//   Z: "+" -> "i" -> "-" -> "-i" -> "+"  (defined; X and Y follow the
-//       same rotation direction of the cube)
+//   Z: "+" -> "i" -> "-" -> "-i" -> "+"
+// Something weird is happening with rotations... TODO - check on real cube and maybe fix later
+// Oh, green is not... Ohh... Well... Green arrows is not full circle... It still works cause of cards set but... Better dont think about it
 const Game::Die::Face ROTATE_PLUS_90[3][6] = {
     {Game::Die::Face::Plus, Game::Die::Face::Minus, Game::Die::Face::Zero, Game::Die::Face::One, Game::Die::Face::MinusI, Game::Die::Face::PlusI},
     {Game::Die::Face::One, Game::Die::Face::Zero, Game::Die::Face::PlusI, Game::Die::Face::MinusI, Game::Die::Face::Plus, Game::Die::Face::Minus},
@@ -50,8 +51,7 @@ void Die::rotate(Axis axis, int degrees) {
 }
 
 std::vector<Die::Face> Die::reachable(Face face, Axis axis) {
-    // Walk the +90 cycle until the start face repeats: all four side
-    // faces for an off-axis face, the face itself for an axis face.
+    // Walk the +90 cycle until the start face repeats
     std::vector<Face> orbit;
     Face current = face;
     do {
